@@ -1,0 +1,58 @@
+name: Development CI/CD
+
+on:
+  push:
+    branches: [ development ]
+  pull_request:
+    branches: [ development ]
+
+env:
+  DOTNET_VERSION: '8.0.x'
+  ASPNETCORE_ENVIRONMENT: 'Development'
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Restore dependencies
+      run: dotnet restore ReleaseNoteBuilder/ReleaseNoteBuilder.csproj
+
+    - name: Build
+      run: dotnet build ReleaseNoteBuilder/ReleaseNoteBuilder.csproj --configuration Debug --no-restore
+
+    - name: Test
+      run: dotnet test ReleaseNoteBuilder/ReleaseNoteBuilder.csproj --configuration Debug --no-build --verbosity normal
+
+    - name: Publish
+      run: dotnet publish ReleaseNoteBuilder/ReleaseNoteBuilder.csproj --configuration Debug --output ./publish
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: release-note-builder-development
+        path: ./publish
+
+  deploy-development:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+
+    steps:
+    - name: Download artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: release-note-builder-development
+        path: ./publish
+
+    - name: Deploy to Development
+      run: |
+        echo "Deploying to Development environment..."
+        echo "Add your deployment steps here (Azure App Service, IIS, Docker, etc.)"

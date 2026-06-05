@@ -1,6 +1,8 @@
 @page "/release"
-@inject Services.ReleaseService ReleaseService
-@inject Services.ReleaseRepository Repo
+@using ReleaseNoteBuilder.Application.Interfaces
+@using ReleaseNoteBuilder.Application.DTOs
+@inject IReleaseService ReleaseService
+@inject IReleaseNoteGenerator NoteGenerator
 
 <h2>Release Note Builder</h2>
 
@@ -51,7 +53,7 @@
     string project = "";
     int buildId = 0;
     string environment = "DEV";
-    string branch = "develop";    //
+    string branch = "develop";
     string notes = "";
     string error = "";
 
@@ -59,7 +61,7 @@
     {
         error = "";
 
-        // ✅ Validation
+        // Validation
         if (string.IsNullOrWhiteSpace(project))
         {
             error = "Project is required";
@@ -71,19 +73,19 @@
             return;
         }
 
-        // ✅ Generate notes
-        notes = ReleaseService.Generate(new(), environment, buildId);
-
-        // ✅ Save to DB
-        await Repo.Save(new Models.ReleaseRecord
+        // Create release
+        var createDto = new CreateReleaseDto
         {
             Project = project,
             BuildId = buildId,
             Environment = environment,
-            Branch = branch,   // ✅ SAVE IT
-            Notes = notes
+            Branch = branch,
+            Notes = $"Release notes for {project} build {buildId}"
+        };
 
-        });
+        var created = await ReleaseService.CreateReleaseAsync(createDto);
 
+        // Generate notes
+        notes = NoteGenerator.GenerateReleaseNote(created);
     }
 }

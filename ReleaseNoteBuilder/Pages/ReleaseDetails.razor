@@ -1,5 +1,8 @@
 ﻿@page "/release/{id:int}"
-@inject Services.ReleaseRepository Repo
+@using ReleaseNoteBuilder.Application.Interfaces
+@using ReleaseNoteBuilder.Application.DTOs
+@using System.Linq
+@inject IReleaseService ReleaseService
 
 <h3>Release Details</h3>
 
@@ -23,12 +26,11 @@ else
     [Parameter]
     public int id { get; set; }
 
-    Models.ReleaseRecord record;
+    ReleaseDto record;
 
     protected override async Task OnInitializedAsync()
     {
-        var all = await Repo.GetAll();
-        record = all.FirstOrDefault(x => x.Id == id);
+        record = await ReleaseService.GetReleaseByIdAsync(id);
     }
 
 }

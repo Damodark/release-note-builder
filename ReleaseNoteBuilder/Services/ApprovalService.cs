@@ -1,1 +1,0 @@
-namespace ReleaseNoteBuilder.Services; public class ApprovalService{}

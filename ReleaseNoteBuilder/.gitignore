@@ -1,0 +1,52 @@
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+# Visual Studio cache/options
+.vscode/
+.vs/
+
+# NuGet Packages
+*.nupkg
+*.snupkg
+**/packages/*
+
+# Build results
+*.dll
+*.exe
+*.pdb
+
+# Publish profiles
+*.pubxml
+*.PublishSettings
+
+# User-specific files
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Sensitive data
+appsettings.*.json
+!appsettings.Development.json
+!appsettings.Staging.json
+!appsettings.Production.json

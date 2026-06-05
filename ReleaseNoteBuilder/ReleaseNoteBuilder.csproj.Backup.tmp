@@ -20,13 +20,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Update="appsettings.json" CopyToOutputDirectory="PreserveNewest" />
-    <Content Update="appsettings.Development.json" CopyToOutputDirectory="PreserveNewest" />
-    <Content Update="appsettings.Staging.json" CopyToOutputDirectory="PreserveNewest" />
-    <Content Update="appsettings.Production.json" CopyToOutputDirectory="PreserveNewest" />
-  </ItemGroup>
-
-  <ItemGroup>
     <None Include=".github\workflows\development.yml" />
     <None Include=".github\workflows\production.yml" />
     <None Include=".github\workflows\staging.yml" />

@@ -1,0 +1,66 @@
+name: Production CI/CD
+
+on:
+  push:
+    branches: [ production ]
+  pull_request:
+    branches: [ production ]
+
+env:
+  DOTNET_VERSION: '8.0.x'
+  ASPNETCORE_ENVIRONMENT: 'Production'
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Restore dependencies
+      run: dotnet restore ReleaseNoteBuilder/ReleaseNoteBuilder.csproj
+
+    - name: Build
+      run: dotnet build ReleaseNoteBuilder/ReleaseNoteBuilder.csproj --configuration Release --no-restore
+
+    - name: Test
+      run: dotnet test ReleaseNoteBuilder/ReleaseNoteBuilder.csproj --configuration Release --no-build --verbosity normal
+
+    - name: Publish
+      run: dotnet publish ReleaseNoteBuilder/ReleaseNoteBuilder.csproj --configuration Release --output ./publish
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: release-note-builder-production
+        path: ./publish
+
+  deploy-production:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    environment:
+      name: production
+
+    steps:
+    - name: Download artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: release-note-builder-production
+        path: ./publish
+
+    - name: Deploy to Production
+      run: |
+        echo "Deploying to Production environment..."
+        echo "Add your deployment steps here (Azure App Service, IIS, Docker, etc.)"
+
+    - name: Create Release Tag
+      if: github.event_name == 'push'
+      run: |
+        git tag -a "v$(date +'%Y.%m.%d.%H%M')" -m "Production release $(date +'%Y-%m-%d %H:%M')"
+        git push origin --tags

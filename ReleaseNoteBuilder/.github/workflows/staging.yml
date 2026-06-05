@@ -1,0 +1,60 @@
+name: Staging CI/CD
+
+on:
+  push:
+    branches: [ staging ]
+  pull_request:
+    branches: [ staging ]
+
+env:
+  DOTNET_VERSION: '8.0.x'
+  ASPNETCORE_ENVIRONMENT: 'Staging'
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Restore dependencies
+      run: dotnet restore ReleaseNoteBuilder/ReleaseNoteBuilder.csproj
+
+    - name: Build
+      run: dotnet build ReleaseNoteBuilder/ReleaseNoteBuilder.csproj --configuration Release --no-restore
+
+    - name: Test
+      run: dotnet test ReleaseNoteBuilder/ReleaseNoteBuilder.csproj --configuration Release --no-build --verbosity normal
+
+    - name: Publish
+      run: dotnet publish ReleaseNoteBuilder/ReleaseNoteBuilder.csproj --configuration Release --output ./publish
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: release-note-builder-staging
+        path: ./publish
+
+  deploy-staging:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    environment:
+      name: staging
+
+    steps:
+    - name: Download artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: release-note-builder-staging
+        path: ./publish
+
+    - name: Deploy to Staging
+      run: |
+        echo "Deploying to Staging environment..."
+        echo "Add your deployment steps here (Azure App Service, IIS, Docker, etc.)"

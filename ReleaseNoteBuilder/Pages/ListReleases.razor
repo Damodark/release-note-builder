@@ -1,7 +1,10 @@
 ﻿@page "/releases"
 
 @using Microsoft.JSInterop
-@inject Services.ReleaseRepository Repo
+@using ReleaseNoteBuilder.Application.Interfaces
+@using ReleaseNoteBuilder.Application.DTOs
+@inject IReleaseService ReleaseService
+@inject IReleaseNoteGenerator NoteGenerator
 @inject IJSRuntime JS
 
 <h3>Release History</h3>
@@ -97,45 +100,28 @@ else
     </table>
 }
 
-<!-- ✅ INFO -->
-<p>
-    Showing @((currentPage - 1) * pageSize + 1)
-    to @(Math.Min(currentPage * pageSize, TotalRecords()))
-    of @TotalRecords() records
-</p>
-
-<!-- ✅ ROWS PER PAGE -->
-<label>Rows per page:</label>
-<select @bind="pageSize">
-    <option value="5">5</option>
-    <option value="10">10</option>
-    <option value="20">20</option>
-</select>
-
-<br /><br />
-
 <div class="pagination-container">
 
-    <!-- ✅ LEFT: INFO -->
+    <!-- LEFT: INFO -->
     <div class="pagination-info">
         Showing @((currentPage - 1) * pageSize + 1)
         to @(Math.Min(currentPage * pageSize, TotalRecords()))
         of @TotalRecords() records
     </div>
 
-    <!-- ✅ CENTER: PAGINATION -->
+    <!-- CENTER: PAGINATION -->
     <div class="pagination-controls">
 
         <button @onclick="PrevPage" disabled="@(currentPage == 1)">Prev</button>
 
         @for (int i = 1; i <= TotalPages(); i++)
         {
-            var page = i;   // ✅ CAPTURE VALUE CORRECTLY
+            var pageNumber = i;
 
-            <button @onclick="() => GoToPage(page)"
-                    disabled="@(page == currentPage)"
-                    class="@(page == currentPage ? "active-page" : "")">
-                @page
+            <button @onclick="() => GoToPage(pageNumber)"
+                    disabled="@(pageNumber == currentPage)"
+                    class="@(pageNumber == currentPage ? "active-page" : "")">
+                @pageNumber
             </button>
         }
 
@@ -143,29 +129,18 @@ else
 
     </div>
 
-    <!-- ✅ RIGHT: PAGE SIZE + GOTO -->
+    <!-- RIGHT: PAGE SIZE -->
     <div class="pagination-extra">
-
-        <label>Rows:</label>
+        <label>Rows per page:</label>
         <select @bind="pageSize">
             <option value="5">5</option>
             <option value="10">10</option>
             <option value="20">20</option>
         </select>
-
-        <label>Go:</label>
-        <input type="number" @bind="gotoPage" style="width:50px;" />
-
-        <button @onclick="GoToPageInput">Go</button>
-
     </div>
 
 </div>
 <br />
-
-<!-- ✅ GO TO PAGE -->
-<input type="number" @bind="gotoPage" style="width:60px;" />
-<button @onclick="GoToPageInput">Go</button>
 
 <!-- ✅ MODAL -->
 @if (selected != null)
@@ -205,10 +180,10 @@ else
 }
 
 @code {
-    List<Models.ReleaseRecord> records;
-    Models.ReleaseRecord selected;
+    List<ReleaseDto> records;
+    ReleaseDto selected;
 
-    IEnumerable<Models.ReleaseRecord> FilteredData =>
+    IEnumerable<ReleaseDto> FilteredData =>
         records.Where(r =>
             (string.IsNullOrEmpty(searchText) ||
              r.Project.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
@@ -221,8 +196,21 @@ else
     string filterEnv = "";
 
     int currentPage = 1;
-    int pageSize = 5;
-    int gotoPage;
+
+    int _pageSize = 5;
+    int pageSize
+    {
+        get => _pageSize;
+        set
+        {
+            if (_pageSize != value)
+            {
+                _pageSize = value;
+                currentPage = 1;   // ✅ reset to page 1 when page size changes
+                ValidatePage();
+            }
+        }
+    }
 
     bool showFilters = true;
 
@@ -250,11 +238,11 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        records = await Repo.GetAll();
+        records = await ReleaseService.GetAllReleasesAsync();
     }
 
     // ✅ FILTER + PAGING
-    IEnumerable<Models.ReleaseRecord> Filtered()
+    IEnumerable<ReleaseDto> Filtered()
     {
         var totalPages = (int)Math.Ceiling((double)FilteredData.Count() / pageSize);
 
@@ -306,14 +294,7 @@ else
             currentPage = TotalPages();
     }
 
-
-    void GoToPageInput()
-        => GoToPage(gotoPage);
-
-    void ResetPage()
-        => currentPage = 1;
-
-    void ShowDetails(Models.ReleaseRecord r) => selected = new Models.ReleaseRecord
+    void ShowDetails(ReleaseDto r) => selected = new ReleaseDto
     {
         Id = r.Id,
         Project = r.Project,
@@ -323,20 +304,24 @@ else
         Notes = r.Notes
     };
 
-    void Edit(Models.ReleaseRecord r) => ShowDetails(r);
+    void Edit(ReleaseDto r) => ShowDetails(r);
 
     async Task Save()
     {
-        var original = records.FirstOrDefault(x => x.Id == selected.Id);
-        if (original == null) return;
+        var updateDto = new UpdateReleaseDto
+        {
+            Id = selected.Id,
+            Project = selected.Project,
+            BuildId = selected.BuildId,
+            Environment = selected.Environment,
+            Branch = selected.Branch,
+            Notes = selected.Notes
+        };
 
-        original.Project = selected.Project;
-        original.BuildId = selected.BuildId;
-        original.Environment = selected.Environment;
-        original.Branch = selected.Branch;
-        original.Notes = selected.Notes;
+        await ReleaseService.UpdateReleaseAsync(updateDto);
 
-        await Repo.Update(original);
+        // Refresh the list
+        records = await ReleaseService.GetAllReleasesAsync();
 
         await JS.InvokeVoidAsync("showToast", "Saved ✅");
 
@@ -348,13 +333,12 @@ else
         var confirm = await JS.InvokeAsync<bool>("confirm", "Delete?");
         if (!confirm) return;
 
-        var item = records.FirstOrDefault(x => x.Id == id);
-        if (item != null)
-        {
-            records.Remove(item);
-            await Repo.Delete(id);
-            await JS.InvokeVoidAsync("showToast", "Deleted ✅");
-        }
+        await ReleaseService.DeleteReleaseAsync(id);
+
+        // Refresh the list
+        records = await ReleaseService.GetAllReleasesAsync();
+
+        await JS.InvokeVoidAsync("showToast", "Deleted ✅");
     }
 
     void CloseModal() => selected = null;
@@ -362,10 +346,7 @@ else
     // ✅ EXPORT TO WORD
     async Task ExportToWord()
     {
-        var content = string.Join("\n\n", records.Select(r =>
-            $"Project: {r.Project}\nBuild: {r.BuildId}\nEnv: {r.Environment}\nBranch: {r.Branch}\nDate: {r.CreatedAt}\n\nNotes:\n{r.Notes}"
-        ));
-
+        var content = await NoteGenerator.ExportToWordAsync(records);
         await JS.InvokeVoidAsync("downloadFile", "releases.doc", content);
     }
 

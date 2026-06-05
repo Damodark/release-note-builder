@@ -1,6 +1,10 @@
 using Microsoft.EntityFrameworkCore;
-using ReleaseNoteBuilder.Data;
-using ReleaseNoteBuilder.Services;
+using ReleaseNoteBuilder.Infrastructure.Persistence;
+using ReleaseNoteBuilder.Infrastructure.Persistence.Repositories;
+using ReleaseNoteBuilder.Infrastructure.ExternalServices;
+using ReleaseNoteBuilder.Core.Interfaces;
+using ReleaseNoteBuilder.Application.Interfaces;
+using ReleaseNoteBuilder.Application.Services;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -11,25 +15,31 @@ builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor()
     .AddCircuitOptions(options => { options.DetailedErrors = true; });
 
-builder.Services.AddDbContext<AppDbContext>(options =>
+// Infrastructure - Database
+builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseInMemoryDatabase("ReleaseDb"));
 
-builder.Services.AddScoped<AdoService>();
-builder.Services.AddScoped<ReleaseService>();
-builder.Services.AddScoped<ReleaseRepository>();
+// Infrastructure - Repositories
+builder.Services.AddScoped<IReleaseRepository, ReleaseRepository>();
+
+// Application - Services
+builder.Services.AddScoped<IReleaseService, ReleaseService>();
+builder.Services.AddScoped<IReleaseNoteGenerator, ReleaseNoteGenerator>();
+
+// Infrastructure - External Services
+builder.Services.AddScoped<AzureDevOpsService>();
 builder.Services.AddScoped<ApprovalService>();
 
 var app = builder.Build();
 
-// ✅ SEED DATA (PUT IT HERE ✅)
+// Seed Data
 using (var scope = app.Services.CreateScope())
 {
-    var repo = scope.ServiceProvider.GetRequiredService<ReleaseRepository>();
-    await repo.SeedData();
+    var repo = scope.ServiceProvider.GetRequiredService<IReleaseRepository>();
+    await repo.SeedDataAsync();
 }
 
-// ✅ MIDDLEWARE
-
+// Middleware
 app.UseStaticFiles();
 app.UseRouting();
 

@@ -195,7 +195,19 @@ strong {
 .pagination-extra {
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: 8px;
+    min-width: 180px;
+}
+
+.pagination-extra label {
+    white-space: nowrap;
+    margin-bottom: 0;
+    font-size: 14px;
+}
+
+.pagination-extra select {
+    width: 65px;
+    margin-bottom: 0;
 }
 
 .active-page {
