@@ -6,7 +6,7 @@
 All branches have been created and pushed to your GitHub repository:
 - **development** - For development environment
 - **staging** - For staging/pre-production environment  
-- **production** - For production environment
+- **hotfix** - For production environment
 
 ### 2. Environment Configurations Created
 Each branch has its own configuration file in the `appsettings.{Environment}.json` format:
@@ -44,11 +44,11 @@ GitHub Actions workflows have been created for each environment:
 - Runs tests
 - Deploys to staging environment (with environment protection)
 
-#### `.github/workflows/production.yml`
-- Triggers on push/PR to `production` branch
+#### `.github/workflows/hotfix.yml`
+- Triggers on push/PR to `hotfix` branch
 - Builds in Release configuration
 - Runs tests
-- Deploys to production environment (with environment protection)
+- Deploys to hotfix environment (with environment protection)
 - Creates release tags automatically
 
 ### 4. Additional Fixes
@@ -64,7 +64,7 @@ Go to your GitHub repository settings and add these secrets:
 **For Azure App Service deployment (if applicable):**
 - `AZURE_WEBAPP_PUBLISH_PROFILE_DEV`
 - `AZURE_WEBAPP_PUBLISH_PROFILE_STAGING`
-- `AZURE_WEBAPP_PUBLISH_PROFILE_PROD`
+- `AZURE_WEBAPP_PUBLISH_PROFILE_HOTFIX`
 
 **For Azure DevOps integration:**
 - `AZURE_DEVOPS_PAT` - Personal Access Token
@@ -90,7 +90,7 @@ In GitHub → Settings → Branches, set up protection rules:
 - Require pull request reviews
 - Require status checks to pass
 
-**For `production`:**
+**For `hotfix`:**
 - Require 2+ pull request reviews
 - Require status checks to pass
 - Consider requiring signed commits
@@ -111,11 +111,11 @@ git checkout staging
 git commit -m "Test staging pipeline"
 git push origin staging
 
-# Test production pipeline
-git checkout production
+# Test hotfix pipeline
+git checkout hotfix
 # make a small change
-git commit -m "Test production pipeline"
-git push origin production
+git commit -m "Test hotfix pipeline"
+git push origin hotfix
 ```
 
 ### 5. Workflow Pattern
@@ -124,7 +124,7 @@ git push origin production
 ```
 feature branch → main → development (auto-deploy to dev)
               → staging (manual merge, auto-deploy to staging)
-              → production (manual merge after QA, auto-deploy to prod)
+              → hotfix (manual merge after QA, auto-deploy to prod)
 ```
 
 ## 📁 Repository Structure
@@ -135,7 +135,7 @@ ReleaseNoteBuilder/
 │   └── workflows/
 │       ├── development.yml
 │       ├── staging.yml
-│       └── production.yml
+│       └── hotfix.yml
 ├── appsettings.json
 ├── appsettings.Development.json
 ├── appsettings.Staging.json

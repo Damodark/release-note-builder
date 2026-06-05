@@ -28,7 +28,7 @@
 
   <ItemGroup>
     <None Include=".github\workflows\development.yml" />
-    <None Include=".github\workflows\production.yml" />
+    <None Include=".github\workflows\hotfix.yml" />
     <None Include=".github\workflows\staging.yml" />
   </ItemGroup>
 

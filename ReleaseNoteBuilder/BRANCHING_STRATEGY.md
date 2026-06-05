@@ -23,11 +23,11 @@ The project uses a multi-branch strategy to support different environments:
 - Used for QA and user acceptance testing
 - Triggers: Push to `staging` branch
 
-### 4. **production**
-- Production environment branch
+### 4. **hotfix**
+- Hotfix environment branch
 - Live production environment
 - Only stable, tested code should be merged here
-- Triggers: Push to `production` branch
+- Triggers: Push to `hotfix` branch
 - Automatically creates release tags on deployment
 
 ## Environment Configurations
@@ -38,7 +38,7 @@ Each branch has its own configuration file:
 |--------|-------------|-------------|--------------|-----------------|----------|
 | development | `appsettings.Development.json` | Development | Debug | Yes | In-Memory |
 | staging | `appsettings.Staging.json` | Staging | Release | No | Staging DB |
-| production | `appsettings.Production.json` | Production | Release | No | Production DB |
+| hotfix | `appsettings.Production.json` | Production | Release | No | Production DB |
 
 ## CI/CD Pipelines
 
@@ -72,8 +72,8 @@ Each branch has a dedicated GitHub Actions workflow:
   6. Publish artifacts
   7. Deploy to staging environment (with environment protection)
 
-#### Production Pipeline (`.github/workflows/production.yml`)
-- **Trigger**: Push or PR to `production` branch
+#### Hotfix Pipeline (`.github/workflows/hotfix.yml`)
+- **Trigger**: Push or PR to `hotfix` branch
 - **Environment**: Production
 - **Build Configuration**: Release
 - **Steps**:
@@ -83,7 +83,7 @@ Each branch has a dedicated GitHub Actions workflow:
   4. Build (Release mode)
   5. Run tests
   6. Publish artifacts
-  7. Deploy to production environment (with environment protection)
+  7. Deploy to hotfix environment (with environment protection)
   8. Create release tag with timestamp
 
 ## Workflow
@@ -105,12 +105,12 @@ Each branch has a dedicated GitHub Actions workflow:
 4. QA testing in staging environment
 ```
 
-### Deployment to Production
+### Deployment to Hotfix
 ```
 1. Ensure staging is stable and tested
-2. Merge staging to production
+2. Merge staging to hotfix
 3. Automatic CI/CD pipeline triggers
-4. Production deployment with release tag
+4. Hotfix deployment with release tag
 ```
 
 ## Environment Variables & Secrets
@@ -140,7 +140,7 @@ Recommended branch protection rules:
 - Require pull request reviews before merging
 - Require status checks to pass
 
-### production
+### hotfix
 - Require pull request reviews before merging (at least 2 reviewers)
 - Require status checks to pass
 - Require signed commits (optional)
@@ -151,7 +151,7 @@ Recommended branch protection rules:
 - All workflows use .NET 8.0.x
 - Tests are run on every build
 - Artifacts are preserved for 90 days (default)
-- Production deployments create automatic release tags with format: `vYYYY.MM.DD.HHMM`
+- Hotfix deployments create automatic release tags with format: `vYYYY.MM.DD.HHMM`
 - Remember to update deployment steps in workflow files with your actual deployment target (Azure App Service, IIS, Docker, etc.)
 
 ## Getting Started
@@ -160,7 +160,7 @@ Recommended branch protection rules:
 2. All branches are now available on GitHub:
    - `development`
    - `staging`
-   - `production`
+   - `hotfix`
 3. Configure GitHub secrets for your deployment targets
 4. Update the deployment steps in workflow files with your specific deployment commands
 5. Push to respective branches to trigger pipelines

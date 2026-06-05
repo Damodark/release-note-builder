@@ -1,10 +1,10 @@
-name: Production CI/CD
+name: Hotfix CI/CD
 
 on:
   push:
-    branches: [ production ]
+    branches: [ hotfix ]
   pull_request:
-    branches: [ production ]
+    branches: [ hotfix ]
 
 env:
   DOTNET_VERSION: '8.0.x'
@@ -37,30 +37,30 @@ jobs:
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: release-note-builder-production
+        name: release-note-builder-hotfix
         path: ./publish
 
-  deploy-production:
+  deploy-hotfix:
     needs: build-and-test
     runs-on: ubuntu-latest
     if: github.event_name == 'push'
     environment:
-      name: production
+      name: hotfix
 
     steps:
     - name: Download artifact
       uses: actions/download-artifact@v4
       with:
-        name: release-note-builder-production
+        name: release-note-builder-hotfix
         path: ./publish
 
-    - name: Deploy to Production
+    - name: Deploy to Hotfix
       run: |
-        echo "Deploying to Production environment..."
+        echo "Deploying to Hotfix environment..."
         echo "Add your deployment steps here (Azure App Service, IIS, Docker, etc.)"
 
     - name: Create Release Tag
       if: github.event_name == 'push'
       run: |
-        git tag -a "v$(date +'%Y.%m.%d.%H%M')" -m "Production release $(date +'%Y-%m-%d %H:%M')"
+        git tag -a "v$(date +'%Y.%m.%d.%H%M')" -m "Hotfix release $(date +'%Y-%m-%d %H:%M')"
         git push origin --tags
