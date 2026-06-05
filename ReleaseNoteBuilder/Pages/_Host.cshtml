@@ -1,0 +1,57 @@
+@page "/"
+@namespace ReleaseNoteBuilder.Pages
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <title>Release Note Builder</title>
+
+    <!-- ✅ CSS -->
+    <link href="css/site.css" rel="stylesheet" />
+
+    <!-- ✅ Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" rel="stylesheet" />
+</head>
+<script>
+    window.showToast = (message) => {
+        const toast = document.createElement("div");
+        toast.innerText = message;
+
+        toast.style.position = "fixed";
+        toast.style.bottom = "20px";
+        toast.style.right = "20px";
+        toast.style.background = "#0078d4";
+        toast.style.color = "white";
+        toast.style.padding = "10px";
+        toast.style.borderRadius = "5px";
+
+        document.body.appendChild(toast);
+
+        setTimeout(() => toast.remove(), 3000);
+    }
+</script>
+<script>
+    window.downloadFile = (filename, content) => {
+        const blob = new Blob([content], { type: "application/msword" });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = filename;
+        link.click();
+    }
+</script>
+<body>
+<app>
+    <component type="typeof(App)" render-mode="ServerPrerendered" />
+</app>
+
+<!-- ✅ jQuery -->
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+
+<!-- ✅ Blazor -->
+<script src="_framework/blazor.server.js"></script>
+</body>
+
+</html>

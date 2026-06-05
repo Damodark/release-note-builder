@@ -1,0 +1,379 @@
+﻿@page "/releases"
+
+@using Microsoft.JSInterop
+@inject Services.ReleaseRepository Repo
+@inject IJSRuntime JS
+
+<h3>Release History</h3>
+
+<!-- ✅ SEARCH + FILTER -->
+<button @onclick="ToggleFilters" class="filter-toggle">
+    @(showFilters ? "▼ Hide Filters" : "▶ Show Filters")
+</button>
+
+@if (showFilters)
+{
+    <div class="filters">
+
+        <div class="filter-item">
+            <label>Search</label>
+            <input @bind="searchText" @bind:event="oninput" />
+        </div>
+
+        <div class="filter-item">
+            <label>Environment</label>
+            <select @bind="filterEnv">
+                <option value="">All</option>
+                <option>DEV</option>
+                <option>TEST</option>
+                <option>UAT</option>
+                <option>PROD</option>
+            </select>
+        </div>
+
+        <div class="filter-item">
+            <label>&nbsp;</label>
+            <button @onclick="ExportToWord">📄 Export</button>
+        </div>
+
+    </div>
+}
+<br /><br />
+
+@if (records == null)
+{
+    <p>Loading...</p>
+}
+else if (!records.Any())
+{
+    <p>No releases found.</p>
+}
+else
+{
+    <table>
+        <thead>
+        <tr>
+            <th>Build</th>
+            <th>Project</th>
+            <th>Env</th>
+            <th>Branch</th>
+            <th>Date</th>
+            <th>Actions</th>
+        </tr>
+        </thead>
+
+        <tbody>
+        @foreach (var r in Filtered())
+        {
+            <tr class="@GetRowClass(r.Environment ?? "")">
+                <td>@r.BuildId</td>
+                <td>@r.Project</td>
+
+                <td>
+                    <span class="badge @GetRowClass(r.Environment)">
+                        @r.Environment
+                    </span>
+                </td>
+
+                <td>@r.Branch</td>
+                <td>@r.CreatedAt.ToString("yyyy-MM-dd HH:mm")</td>
+
+                <td>
+                    <button @onclick="(() => ShowDetails(r))">
+                        <i class="fa-solid fa-eye"></i>
+                    </button>
+
+                    <button @onclick="(() => Edit(r))">
+                        <i class="fa-solid fa-pen"></i>
+                    </button>
+
+                    <button @onclick="(() => Delete(r.Id))">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}
+
+<!-- ✅ INFO -->
+<p>
+    Showing @((currentPage - 1) * pageSize + 1)
+    to @(Math.Min(currentPage * pageSize, TotalRecords()))
+    of @TotalRecords() records
+</p>
+
+<!-- ✅ ROWS PER PAGE -->
+<label>Rows per page:</label>
+<select @bind="pageSize">
+    <option value="5">5</option>
+    <option value="10">10</option>
+    <option value="20">20</option>
+</select>
+
+<br /><br />
+
+<div class="pagination-container">
+
+    <!-- ✅ LEFT: INFO -->
+    <div class="pagination-info">
+        Showing @((currentPage - 1) * pageSize + 1)
+        to @(Math.Min(currentPage * pageSize, TotalRecords()))
+        of @TotalRecords() records
+    </div>
+
+    <!-- ✅ CENTER: PAGINATION -->
+    <div class="pagination-controls">
+
+        <button @onclick="PrevPage" disabled="@(currentPage == 1)">Prev</button>
+
+        @for (int i = 1; i <= TotalPages(); i++)
+        {
+            var page = i;   // ✅ CAPTURE VALUE CORRECTLY
+
+            <button @onclick="() => GoToPage(page)"
+                    disabled="@(page == currentPage)"
+                    class="@(page == currentPage ? "active-page" : "")">
+                @page
+            </button>
+        }
+
+        <button @onclick="NextPage" disabled="@(currentPage >= TotalPages())">Next</button>
+
+    </div>
+
+    <!-- ✅ RIGHT: PAGE SIZE + GOTO -->
+    <div class="pagination-extra">
+
+        <label>Rows:</label>
+        <select @bind="pageSize">
+            <option value="5">5</option>
+            <option value="10">10</option>
+            <option value="20">20</option>
+        </select>
+
+        <label>Go:</label>
+        <input type="number" @bind="gotoPage" style="width:50px;" />
+
+        <button @onclick="GoToPageInput">Go</button>
+
+    </div>
+
+</div>
+<br />
+
+<!-- ✅ GO TO PAGE -->
+<input type="number" @bind="gotoPage" style="width:60px;" />
+<button @onclick="GoToPageInput">Go</button>
+
+<!-- ✅ MODAL -->
+@if (selected != null)
+{
+    <div class="modal-overlay">
+        <div class="modal-box">
+
+            <h4>Edit Release</h4>
+
+            <label>Project</label>
+            <input @bind="selected.Project" />
+
+            <label>Build</label>
+            <input type="number" @bind="selected.BuildId" />
+
+            <label>Environment</label>
+            <select @bind="selected.Environment">
+                <option>DEV</option>
+                <option>TEST</option>
+                <option>UAT</option>
+                <option>PROD</option>
+            </select>
+
+            <label>Branch</label>
+            <input @bind="selected.Branch" />
+
+            <label>Notes</label>
+            <textarea @bind="selected.Notes"></textarea>
+
+            <br />
+
+            <button @onclick="Save">Save</button>
+            <button @onclick="CloseModal">Cancel</button>
+
+        </div>
+    </div>
+}
+
+@code {
+    List<Models.ReleaseRecord> records;
+    Models.ReleaseRecord selected;
+
+    IEnumerable<Models.ReleaseRecord> FilteredData =>
+        records.Where(r =>
+            (string.IsNullOrEmpty(searchText) ||
+             r.Project.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
+             r.Branch.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+            &&
+            (string.IsNullOrEmpty(filterEnv) || r.Environment == filterEnv)
+        );
+
+    string _searchText = "";
+    string filterEnv = "";
+
+    int currentPage = 1;
+    int pageSize = 5;
+    int gotoPage;
+
+    bool showFilters = true;
+
+    void ToggleFilters()
+    {
+        showFilters = !showFilters;
+    }
+
+
+
+    string searchText
+    {
+        get => _searchText;
+        set
+        {
+            if (_searchText != value)
+            {
+                _searchText = value;
+                currentPage = 1;   // ✅ reset pagination here
+                ValidatePage();
+            }
+        }
+    }
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        records = await Repo.GetAll();
+    }
+
+    // ✅ FILTER + PAGING
+    IEnumerable<Models.ReleaseRecord> Filtered()
+    {
+        var totalPages = (int)Math.Ceiling((double)FilteredData.Count() / pageSize);
+
+        if (currentPage > totalPages)
+        {
+            currentPage = totalPages == 0 ? 1 : totalPages;
+        }
+
+        return FilteredData
+            .Skip((currentPage - 1) * pageSize)
+            .Take(pageSize);
+    }
+
+    int TotalRecords()
+    {
+        return FilteredData.Count();
+    }
+
+
+    int TotalPages()
+        => (int)Math.Ceiling((double)TotalRecords() / pageSize);
+
+    void NextPage()
+    {
+        if (currentPage < TotalPages())
+            currentPage++;
+    }
+
+    void PrevPage()
+    {
+        if (currentPage > 1)
+            currentPage--;
+    }
+
+
+    void GoToPage(int page)
+    {
+        if (page < 1 || page > TotalPages())
+            return;
+
+        currentPage = page;
+
+      //  StateHasChanged();   // ✅ ensures UI updates
+    }
+
+    void ValidatePage()
+    {
+        if (currentPage > TotalPages())
+            currentPage = TotalPages();
+    }
+
+
+    void GoToPageInput()
+        => GoToPage(gotoPage);
+
+    void ResetPage()
+        => currentPage = 1;
+
+    void ShowDetails(Models.ReleaseRecord r) => selected = new Models.ReleaseRecord
+    {
+        Id = r.Id,
+        Project = r.Project,
+        BuildId = r.BuildId,
+        Environment = r.Environment,
+        Branch = r.Branch,
+        Notes = r.Notes
+    };
+
+    void Edit(Models.ReleaseRecord r) => ShowDetails(r);
+
+    async Task Save()
+    {
+        var original = records.FirstOrDefault(x => x.Id == selected.Id);
+        if (original == null) return;
+
+        original.Project = selected.Project;
+        original.BuildId = selected.BuildId;
+        original.Environment = selected.Environment;
+        original.Branch = selected.Branch;
+        original.Notes = selected.Notes;
+
+        await Repo.Update(original);
+
+        await JS.InvokeVoidAsync("showToast", "Saved ✅");
+
+        selected = null;
+    }
+
+    async Task Delete(int id)
+    {
+        var confirm = await JS.InvokeAsync<bool>("confirm", "Delete?");
+        if (!confirm) return;
+
+        var item = records.FirstOrDefault(x => x.Id == id);
+        if (item != null)
+        {
+            records.Remove(item);
+            await Repo.Delete(id);
+            await JS.InvokeVoidAsync("showToast", "Deleted ✅");
+        }
+    }
+
+    void CloseModal() => selected = null;
+
+    // ✅ EXPORT TO WORD
+    async Task ExportToWord()
+    {
+        var content = string.Join("\n\n", records.Select(r =>
+            $"Project: {r.Project}\nBuild: {r.BuildId}\nEnv: {r.Environment}\nBranch: {r.Branch}\nDate: {r.CreatedAt}\n\nNotes:\n{r.Notes}"
+        ));
+
+        await JS.InvokeVoidAsync("downloadFile", "releases.doc", content);
+    }
+
+    string GetRowClass(string env) => env switch
+    {
+        "PROD" => "prod-row",
+        "UAT" => "uat-row",
+        "TEST" => "test-row",
+        _ => ""
+    };
+}

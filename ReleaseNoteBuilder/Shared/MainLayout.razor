@@ -1,0 +1,29 @@
+@inherits LayoutComponentBase
+
+<div class="main-layout">
+
+    <!-- ✅ Navigation Menu -->
+    <NavLink href="/" Match="NavLinkMatch.All">
+        <a href="/"><i class="fa-solid fa-house"></i> Home</a>
+    </NavLink>
+
+    <span>|</span>
+
+    <NavLink href="/release">
+        <a href="/release"> <i class="fa-solid fa-file"></i> Create Release</a>
+    </NavLink>
+
+    <span>|</span>
+
+    <NavLink href="/releases">
+        <a href="/releases"><i class="fa-solid fa-list"></i> Release History</a>
+    </NavLink>
+
+    <hr />
+
+    <!-- ✅ Page Content -->
+    <div class="content">
+        @Body
+    </div>
+
+</div>

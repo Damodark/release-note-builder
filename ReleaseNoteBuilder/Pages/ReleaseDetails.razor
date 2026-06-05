@@ -1,0 +1,34 @@
+﻿@page "/release/{id:int}"
+@inject Services.ReleaseRepository Repo
+
+<h3>Release Details</h3>
+
+@if (record == null)
+{
+    <p>Loading...</p>
+}
+else
+{
+    <p><b>Project:</b> @record.Project</p>
+    <p><b>Build:</b> @record.BuildId</p>
+    <p><b>Environment:</b> @record.Environment</p>
+    <p><b>Date:</b> @record.CreatedAt</p>
+
+    <h4>Notes</h4>
+    <pre>@record.Notes</pre>
+
+}
+
+@code {
+    [Parameter]
+    public int id { get; set; }
+
+    Models.ReleaseRecord record;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var all = await Repo.GetAll();
+        record = all.FirstOrDefault(x => x.Id == id);
+    }
+
+}

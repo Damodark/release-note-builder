@@ -1,0 +1,89 @@
+@page "/release"
+@inject Services.ReleaseService ReleaseService
+@inject Services.ReleaseRepository Repo
+
+<h2>Release Note Builder</h2>
+
+<div class="form">
+
+    <div class="form-group">
+        <label>Project</label>
+        <input @bind="project" class="input" />
+    </div>
+
+    <div class="form-group">
+        <label>Build ID</label>
+        <input type="number" @bind="buildId" class="input" />
+    </div>
+
+    <div class="form-group">
+        <label>Environment</label>
+        <select @bind="environment" class="input">
+            <option>DEV</option>
+            <option>TEST</option>
+            <option>UAT</option>
+            <option>PROD</option>
+        </select>
+    </div>
+    <div class="form-group">
+        <label>Branch</label>
+        <input @bind="branch" />
+    </div>
+
+    <button class="btn" @onclick="Gen">Generate</button>
+
+</div>
+
+<br/>
+
+@if (!string.IsNullOrEmpty(error))
+{
+    <p style="color:red">@error</p>
+}
+
+@if (!string.IsNullOrEmpty(notes))
+{
+    <h4>Release Notes</h4>
+    <pre>@notes</pre>
+}
+
+@code {
+    string project = "";
+    int buildId = 0;
+    string environment = "DEV";
+    string branch = "develop";    //
+    string notes = "";
+    string error = "";
+
+    async Task Gen()
+    {
+        error = "";
+
+        // ✅ Validation
+        if (string.IsNullOrWhiteSpace(project))
+        {
+            error = "Project is required";
+            return;
+        }
+        if (buildId <= 0)
+        {
+            error = "Build ID must be greater than 0";
+            return;
+        }
+
+        // ✅ Generate notes
+        notes = ReleaseService.Generate(new(), environment, buildId);
+
+        // ✅ Save to DB
+        await Repo.Save(new Models.ReleaseRecord
+        {
+            Project = project,
+            BuildId = buildId,
+            Environment = environment,
+            Branch = branch,   // ✅ SAVE IT
+            Notes = notes
+
+        });
+
+    }
+}
