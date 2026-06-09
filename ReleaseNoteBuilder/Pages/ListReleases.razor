@@ -6,12 +6,52 @@
 @inject IReleaseService ReleaseService
 @inject IReleaseNoteGenerator NoteGenerator
 @inject IJSRuntime JS
+@inject NavigationManager Navigation
 
-<h3>Release History</h3>
+<div class="releases-header">
+    <h3>Release History</h3>
+    <button @onclick="CreateNewRelease" class="btn-create-release">
+        Add New Release
+    </button>
+</div>
 
-<!-- ✅ SEARCH + FILTER -->
+<style>
+    .releases-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        padding-bottom: 15px;
+        border-bottom: 2px solid #ddd;
+    }
+
+    .releases-header h3 {
+        margin: 0;
+        font-size: 24px;
+        color: #333;
+    }
+
+    .btn-create-release {
+        padding: 10px 20px;
+        background: #107c10;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: bold;
+        font-size: 16px;
+        transition: all 0.2s ease;
+    }
+
+    .btn-create-release:hover {
+        background: #0d5c0d;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
+</style>
+
+<!-- SEARCH + FILTER -->
 <button @onclick="ToggleFilters" class="filter-toggle">
-    @(showFilters ? "▼ Hide Filters" : "▶ Show Filters")
+    @(showFilters ? "Hide Filters" : "Show Filters")
 </button>
 
 @if (showFilters)
@@ -357,4 +397,10 @@ else
         "TEST" => "test-row",
         _ => ""
     };
+
+    void CreateNewRelease()
+    {
+        // Navigation to the create release page
+        Navigation.NavigateTo("releases/create");
+    }
 }

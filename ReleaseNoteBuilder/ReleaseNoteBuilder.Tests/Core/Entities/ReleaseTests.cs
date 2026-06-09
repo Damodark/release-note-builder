@@ -63,7 +63,7 @@ public class ReleaseTests
         var release = new Release { Environment = environment };
 
         // Act
-        var result = release.IsProduction();
+        var result = release.IsProduction;
 
         // Assert
         result.Should().Be(expectedResult);

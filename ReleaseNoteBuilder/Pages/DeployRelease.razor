@@ -1,0 +1,170 @@
+@page "/releases/deploy/{ReleaseId:int}"
+
+@using ReleaseNoteBuilder.Application.Interfaces
+@using ReleaseNoteBuilder.Application.DTOs
+@using ReleaseNoteBuilder.Core.Entities
+@using ReleaseStatus = ReleaseNoteBuilder.Application.DTOs.ReleaseStatus;
+@inject IReleaseService ReleaseService
+@inject NavigationManager Navigation
+
+<h3>Deploy Release</h3>
+
+@if (release == null)
+{
+    <p>Loading...</p>
+}
+else
+{
+    <div class="release-details">
+        <p><strong>Build ID:</strong> @release.BuildId</p>
+        <p><strong>Project:</strong> @release.Project</p>
+        <p><strong>Environment:</strong> <span class="badge @GetBadgeClass(release.Environment)">@release.Environment</span></p>
+        <p><strong>Branch:</strong> @release.Branch</p>
+        <p><strong>Status:</strong> <span class="badge @GetStatusBadgeClass(release.Status)">@release.Status</span></p>
+        <p><strong>Created:</strong> @release.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")</p>
+
+        @if (release.ApprovedAt.HasValue)
+        {
+            <p><strong>Approved By:</strong> @release.ApprovedBy on @release.ApprovedAt?.ToString("yyyy-MM-dd HH:mm:ss")</p>
+        }
+    </div>
+
+    <div class="work-items">
+        <h4>Associated Work Items</h4>
+        @if (release.WorkItems.Any())
+        {
+            <ul>
+                @foreach (var wi in release.WorkItems)
+                {
+                    <li>
+                        <strong>@wi.Title</strong> (Type: @wi.Type)
+                        <p>@wi.Description</p>
+                    </li>
+                }
+            </ul>
+        }
+        else
+        {
+            <p>No work items associated.</p>
+        }
+    </div>
+
+    <div class="deployment-actions">
+        @if (release.Status == ReleaseStatus.Approved)
+        {
+            <button @onclick="DeployReleaseAsync" class="btn btn-success" disabled="@isDeploying">
+                @if (isDeploying)
+                {
+                    <span>🔄 Deploying...</span>
+                }
+                else
+                {
+                    <span>🚀 Deploy to @release.Environment</span>
+                }
+            </button>
+        }
+        else if (release.Status == ReleaseStatus.Deployed)
+        {
+            <div class="alert alert-success">
+                ✅ Release deployed on @release.DeployedAt?.ToString("yyyy-MM-dd HH:mm:ss")
+            </div>
+        }
+        else
+        {
+            <div class="alert alert-warning">
+                ⚠️ Release must be approved before deployment (Current status: @release.Status)
+            </div>
+        }
+
+        <button @onclick="GoBack" class="btn btn-secondary">← Back</button>
+    </div>
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger">@errorMessage</div>
+    }
+}
+
+@code {
+    [Parameter]
+    public int ReleaseId { get; set; }
+
+    private ReleaseDto? release;
+    private bool isDeploying = false;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadRelease();
+    }
+
+    private async Task LoadRelease()
+    {
+        try
+        {
+            release = await ReleaseService.GetReleaseByIdAsync(ReleaseId);
+            if (release == null)
+            {
+                errorMessage = "Release not found.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading release: {ex.Message}";
+        }
+    }
+
+    private async Task DeployReleaseAsync()
+    {
+        if (release == null) return;
+
+        isDeploying = true;
+        errorMessage = null;
+
+        try
+        {
+            var deployed = await ReleaseService.DeployReleaseAsync(ReleaseId);
+            release = deployed;
+            errorMessage = null;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Deployment failed: {ex.Message}";
+        }
+        finally
+        {
+            isDeploying = false;
+        }
+    }
+
+    private void GoBack()
+    {
+        Navigation.NavigateTo("/releases");
+    }
+
+    private string GetBadgeClass(string environment)
+    {
+        return environment switch
+        {
+            "PROD" => "badge-danger",
+            "UAT" => "badge-warning",
+            "TEST" => "badge-info",
+            "DEV" => "badge-secondary",
+            _ => "badge-light"
+        };
+    }
+
+    private string GetStatusBadgeClass(ReleaseStatus status)
+    {
+        return status switch
+        {
+            ReleaseStatus.Draft => "badge-secondary",
+            ReleaseStatus.PendingApproval => "badge-info",
+            ReleaseStatus.Approved => "badge-success",
+            ReleaseStatus.Deployed => "badge-primary",
+            ReleaseStatus.Rejected => "badge-danger",
+            ReleaseStatus.Failed => "badge-danger",
+            _ => "badge-light"
+        };
+    }
+}

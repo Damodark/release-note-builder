@@ -1,0 +1,204 @@
+@page "/releases/create"
+@using ReleaseNoteBuilder.Application.Interfaces
+@using ReleaseNoteBuilder.Application.DTOs
+@using ReleaseNoteBuilder.Pages.Components
+@inject IReleaseService ReleaseService
+@inject IBuildService BuildService
+@inject IWorkItemService WorkItemService
+@inject NavigationManager Navigation
+
+<div class="create-release-container">
+    <h2>📋 Create New Release</h2>
+
+    <!-- TAB NAVIGATION -->
+    <div class="tab-navigation">
+        <button class="tab-button @(currentTab == 1 ? "active" : "")" @onclick="() => SelectTab(1)">
+            📝 Release Details
+        </button>
+        <button class="tab-button @(currentTab == 2 ? "active" : "")" @onclick="() => SelectTab(2)" disabled="@(currentTab < 2)">
+            🏗️ Builds & Work Items
+        </button>
+        <button class="tab-button @(currentTab == 3 ? "active" : "")" @onclick="() => SelectTab(3)" disabled="@(currentTab < 3)">
+            ✅ Notification & Approval
+        </button>
+    </div>
+
+    <!-- TAB CONTENT -->
+    <div class="tab-content">
+        @if (currentTab == 1)
+        {
+            <ReleaseDetailsTab 
+                @bind-ReleaseForm="releaseForm"
+                @bind-GeneratedBuildId="generatedBuildId"
+                OnNext="GoToTab2"
+                OnCancel="GoBack"
+                ErrorMessage="@errorMessage"
+                SuccessMessage="@successMessage" />
+        }
+        else if (currentTab == 2)
+        {
+            <BuildsAndWorkItemsTab 
+                @ref="buildsAndWorkItemsTab"
+                ProjectName="@releaseForm.Project"
+                ReleaseEnvironment="@releaseForm.Environment"
+                CurrentUser="@currentLoggedInUser"
+                OnComplete="GoToTab3"
+                OnBack="GoToTab1" />
+        }
+        else if (currentTab == 3)
+        {
+            <NotificationApprovalTab 
+                ReleaseForm="releaseForm"
+                GeneratedBuildId="generatedBuildId"
+                SelectedWorkItems="selectedWorkItems"
+                ErrorMessage="@errorMessage"
+                SuccessMessage="@successMessage"
+                OnBack="() => SelectTab(2)"
+                OnComplete="CompleteRelease" />
+        }
+    </div>
+
+    <!-- PROGRESS INDICATOR -->
+    <div class="progress-bar">
+        <div class="progress-fill" style="width: @(currentTab * 33.33)%"></div>
+    </div>
+</div>
+
+<style>
+    .create-release-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+        background: #f5f5f5;
+        border-radius: 8px;
+    }
+
+    .tab-navigation {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 30px;
+        border-bottom: 2px solid #ddd;
+    }
+
+    .tab-button {
+        padding: 12px 20px;
+        background: white;
+        border: 2px solid transparent;
+        border-bottom: 3px solid #ddd;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        transition: all 0.3s ease;
+    }
+
+    .tab-button:hover:not(:disabled) {
+        background: #f0f0f0;
+        border-bottom-color: #0078d4;
+    }
+
+    .tab-button.active {
+        background: #0078d4;
+        color: white;
+        border-bottom-color: #0078d4;
+    }
+
+    .tab-button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .tab-content {
+        background: white;
+        padding: 30px;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .progress-bar {
+        height: 4px;
+        background: #eee;
+        border-radius: 2px;
+        margin-top: 20px;
+        overflow: hidden;
+    }
+
+    .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #0078d4, #50e6ff);
+        transition: width 0.3s ease;
+    }
+</style>
+
+@code {
+    private int currentTab = 1;
+    private CreateReleaseDto releaseForm = new();
+    private int generatedBuildId = 0;
+    private List<WorkItemDto> selectedWorkItems = new();
+    private string errorMessage = "";
+    private string successMessage = "";
+    private string currentLoggedInUser = "Admin User"; // Replace with actual user from auth context
+    private BuildsAndWorkItemsTab buildsAndWorkItemsTab;
+
+    private void SelectTab(int tabNumber)
+    {
+        if (tabNumber >= 1 && tabNumber <= 3)
+        {
+            currentTab = tabNumber;
+            errorMessage = "";
+            successMessage = "";
+            StateHasChanged();
+        }
+    }
+
+    private async Task GoToTab1()
+    {
+        currentTab = 1;
+        errorMessage = "";
+        successMessage = "";
+        StateHasChanged();
+        await Task.CompletedTask;
+    }
+
+    private async Task GoToTab2()
+    {
+        currentTab = 2;
+        errorMessage = "";
+        successMessage = "";
+        StateHasChanged();
+        await Task.CompletedTask;
+    }
+
+    private async Task GoToTab3()
+    {
+        currentTab = 3;
+        errorMessage = "";
+        successMessage = "";
+        StateHasChanged();
+        await Task.CompletedTask;
+    }
+
+    private void GoBack()
+    {
+        Navigation.NavigateTo("/releases");
+    }
+
+    private async Task CompleteRelease()
+    {
+        try
+        {
+            // Create the release with selected work items
+            releaseForm.Notes = $"Release with {selectedWorkItems.Count} work items selected";
+            var createdRelease = await ReleaseService.CreateReleaseAsync(releaseForm);
+            
+            successMessage = $"Release created successfully! Release ID: {createdRelease.Id}";
+            
+            // Navigate back after short delay
+            await Task.Delay(2000);
+            Navigation.NavigateTo("/releases");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error creating release: {ex.Message}";
+        }
+    }
+}

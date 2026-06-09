@@ -1,0 +1,9 @@
+<!-- ADD THIS AFTER THE <h3> TAG -->
+<div class="top-actions">
+    <button class="btn btn-success" @onclick="() => Navigation.NavigateTo('/releases/create')">
+        ➕ Create New Release
+    </button>
+    <button @onclick="ToggleFilters" class="filter-toggle">
+        @(showFilters ? "▼ Hide Filters" : "▶ Show Filters")
+    </button>
+</div>

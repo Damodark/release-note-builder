@@ -1,0 +1,99 @@
+@page "/releases/edit/{id:int}"
+@using ReleaseNoteBuilder.Application.Interfaces
+@using ReleaseNoteBuilder.Application.DTOs
+@inject IReleaseService ReleaseService
+@inject NavigationManager Navigation
+
+<div class="edit-release-container">
+    <h3>Edit Release</h3>
+
+    @if (release == null)
+    {
+        <p>Loading...</p>
+    }
+    else
+    {
+        <EditForm Model="@release" OnValidSubmit="@HandleUpdateAsync">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+
+            <div class="form-group">
+                <label>Project Name</label>
+                <input class="form-control" @bind="release.Project" />
+            </div>
+
+            <div class="form-group">
+                <label>Build ID</label>
+                <input class="form-control" type="number" @bind="release.BuildId" />
+            </div>
+
+            <div class="form-group">
+                <label>Environment</label>
+                <select class="form-control" @bind="release.Environment">
+                    <option value="DEV">DEV</option>
+                    <option value="TEST">TEST</option>
+                    <option value="UAT">UAT</option>
+                    <option value="PROD">PROD</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Branch</label>
+                <input class="form-control" @bind="release.Branch" />
+            </div>
+
+            <div class="form-group">
+                <label>Release Notes</label>
+                <textarea class="form-control" @bind="release.Notes" rows="5"></textarea>
+            </div>
+
+            <div class="button-group">
+                <button type="submit" class="btn btn-primary">Update Release</button>
+                <button type="button" class="btn btn-secondary" @onclick="@(() => Navigation.NavigateTo("/releases"))">Cancel</button>
+            </div>
+        </EditForm>
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert alert-danger mt-3">@errorMessage</div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private ReleaseDto? release;
+    private string errorMessage = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        release = await ReleaseService.GetReleaseByIdAsync(Id);
+        if (release == null)
+        {
+            errorMessage = "Release not found";
+        }
+    }
+
+    private async Task HandleUpdateAsync()
+    {
+        try
+        {
+            var updateDto = new UpdateReleaseDto
+            {
+                Project = release.Project,
+                BuildId = release.BuildId,
+                Environment = release.Environment,
+                Branch = release.Branch,
+                Notes = release.Notes
+            };
+            await ReleaseService.UpdateReleaseAsync(updateDto);
+            Navigation.NavigateTo("/releases");
+        }
+        catch (Exception ex)
+        {
+            // error handling
+        }
+    }
+}

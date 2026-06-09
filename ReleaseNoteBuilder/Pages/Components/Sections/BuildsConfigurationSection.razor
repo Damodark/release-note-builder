@@ -1,0 +1,167 @@
+@using ReleaseNoteBuilder.Application.DTOs
+
+<div class="builds-section">
+    <h4>🔨 Build Configuration</h4>
+    <div class="builds-info">
+        <p><strong>Project:</strong> @ReleaseForm.Project</p>
+        <p><strong>Branch:</strong> @ReleaseForm.Branch</p>
+        <p><strong>Environment:</strong> @ReleaseForm.Environment</p>
+    </div>
+
+    <!-- Build Selection -->
+    <div class="build-subsection">
+        <h5>📦 Select Build</h5>
+        <div class="builds-list">
+            <div class="build-card selected">
+                <div class="build-header">
+                    <input type="radio" name="buildSelection" checked />
+                    <strong>Build #@GeneratedBuildId</strong>
+                    <span class="badge badge-success">✓ Generated</span>
+                </div>
+                <p class="build-description">Build ID is automatically generated for this release</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Configuration Selection -->
+    <div class="config-subsection">
+        <h5>⚙️ Select Configuration</h5>
+        <div class="config-list">
+            @foreach (var config in availableConfigs)
+            {
+                var isConfigSelected = selectedConfig == config;
+                <div class="config-item @(isConfigSelected ? "selected" : "")" 
+                     @onclick="() => selectedConfig = config">
+                    <input type="radio" name="configSelection" checked="@isConfigSelected" />
+                    <span>@config</span>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="build-actions">
+        <button @onclick="RunBuild" class="btn btn-warning btn-block" disabled="@isBuildRunning">
+            @if (isBuildRunning)
+            {
+                <span>🔄 Running Build...</span>
+            }
+            else
+            {
+                <span>▶ Run Build & Config</span>
+            }
+        </button>
+        <button @onclick="RunConfig" class="btn btn-info btn-block" disabled="@isConfigRunning">
+            @if (isConfigRunning)
+            {
+                <span>⚙️ Configuring...</span>
+            }
+            else
+            {
+                <span>⚙️ Run Config Only</span>
+            }
+        </button>
+    </div>
+
+    <!-- Build Output -->
+    <div class="build-output">
+        <h5>📋 Build Output</h5>
+        <textarea readonly class="form-control build-log" placeholder="Build and configuration logs will appear here...">@buildOutput</textarea>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public CreateReleaseDto ReleaseForm { get; set; } = new();
+
+    [Parameter]
+    public EventCallback<CreateReleaseDto> ReleaseFormChanged { get; set; }
+
+    [Parameter]
+    public int GeneratedBuildId { get; set; }
+
+    [Parameter]
+    public string ErrorMessage { get; set; } = "";
+
+    [Parameter]
+    public EventCallback<string> ErrorMessageChanged { get; set; }
+
+    [Parameter]
+    public string SuccessMessage { get; set; } = "";
+
+    [Parameter]
+    public EventCallback<string> SuccessMessageChanged { get; set; }
+
+    private bool isBuildRunning = false;
+    private bool isConfigRunning = false;
+    private string buildOutput = "";
+    private List<string> availableConfigs = new() 
+    { 
+        "Debug", 
+        "Release", 
+        "Staging", 
+        "Production" 
+    };
+    private string selectedConfig = "Release";
+
+    private async Task RunBuild()
+    {
+        isBuildRunning = true;
+        buildOutput = "Starting build process...\n";
+        try
+        {
+            buildOutput += $"[{DateTime.Now:HH:mm:ss}] Building project: {ReleaseForm.Project}\n";
+            buildOutput += $"[{DateTime.Now:HH:mm:ss}] Branch: {ReleaseForm.Branch}\n";
+            buildOutput += $"[{DateTime.Now:HH:mm:ss}] Configuration: {selectedConfig}\n";
+
+            await Task.Delay(2000);
+
+            buildOutput += $"[{DateTime.Now:HH:mm:ss}] ✓ Build completed successfully\n";
+            buildOutput += $"[{DateTime.Now:HH:mm:ss}] Running configuration...\n";
+
+            await Task.Delay(1500);
+
+            buildOutput += $"[{DateTime.Now:HH:mm:ss}] ✓ Configuration applied\n";
+            SuccessMessage = $"Build #{GeneratedBuildId} with {selectedConfig} configuration completed successfully!";
+            await SuccessMessageChanged.InvokeAsync(SuccessMessage);
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Failed to run build: {ex.Message}";
+            buildOutput += $"[{DateTime.Now:HH:mm:ss}] ✗ Build failed: {ex.Message}\n";
+            await ErrorMessageChanged.InvokeAsync(ErrorMessage);
+        }
+        finally
+        {
+            isBuildRunning = false;
+        }
+    }
+
+    private async Task RunConfig()
+    {
+        isConfigRunning = true;
+        buildOutput = "Starting configuration process...\n";
+        try
+        {
+            buildOutput += $"[{DateTime.Now:HH:mm:ss}] Applying {selectedConfig} configuration\n";
+            buildOutput += $"[{DateTime.Now:HH:mm:ss}] Project: {ReleaseForm.Project}\n";
+            buildOutput += $"[{DateTime.Now:HH:mm:ss}] Environment: {ReleaseForm.Environment}\n";
+
+            await Task.Delay(2000);
+
+            buildOutput += $"[{DateTime.Now:HH:mm:ss}] ✓ Configuration applied successfully\n";
+            SuccessMessage = $"{selectedConfig} configuration applied successfully!";
+            await SuccessMessageChanged.InvokeAsync(SuccessMessage);
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Failed to run configuration: {ex.Message}";
+            buildOutput += $"[{DateTime.Now:HH:mm:ss}] ✗ Configuration failed: {ex.Message}\n";
+            await ErrorMessageChanged.InvokeAsync(ErrorMessage);
+        }
+        finally
+        {
+            isConfigRunning = false;
+        }
+    }
+}

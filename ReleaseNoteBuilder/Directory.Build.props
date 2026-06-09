@@ -1,0 +1,52 @@
+<!-- D:\Projects\ReleaseNoteBuilder\release-note-builder\Directory.Build.props -->
+<Project>
+  <PropertyGroup>
+    <!-- ========================================== -->
+    <!-- VERSION MANAGEMENT CONFIGURATION          -->
+    <!-- FORMAT: XXX.XXX.XXX                       -->
+    <!-- ========================================== -->
+    
+    <!-- Main version numbers - YOU CONTROL THESE -->
+    <!-- Each part can be 0-999 (3 digits) -->
+    <MajorVersion>001</MajorVersion>
+    <MinorVersion>002</MinorVersion>
+    <PatchVersion>000</PatchVersion>
+    
+    <!-- Combined semantic version (automatic) -->
+    <!-- Result: 001.002.000 -->
+    <Version>$(MajorVersion).$(MinorVersion).$(PatchVersion)</Version>
+    
+    <!-- Assembly version (format: X.X.X.X) -->
+    <!-- Converts to: 1.2.0.0 (CLR removes leading zeros) -->
+    <AssemblyVersion>$(MajorVersion).$(MinorVersion).$(PatchVersion).0</AssemblyVersion>
+    
+    <!-- File version (visible in Windows properties) -->
+    <!-- Shows as: 001.002.000.0 -->
+    <FileVersion>$(MajorVersion).$(MinorVersion).$(PatchVersion).0</FileVersion>
+    
+    <!-- Informational version (includes build info) -->
+    <!-- Shows as: 001.002.000+build.1234 -->
+    <InformationalVersion>$(Version)+build.$(GITHUB_RUN_NUMBER)</InformationalVersion>
+    
+  </PropertyGroup>
+
+  <!-- ========================================== -->
+  <!-- BUILD OUTPUT MESSAGES                      -->
+  <!-- ========================================== -->
+  
+  <!-- Display version before build starts -->
+  <Target Name="DisplayVersionInfo" BeforeTargets="Build">
+    <Message Text="════════════════════════════════════════════════════════" Importance="high" />
+    <Message Text="🏗️  Building ReleaseNoteBuilder" Importance="high" />
+    <Message Text="📦 Version: $(Version)" Importance="high" />
+    <Message Text="🔧 Assembly Version: $(AssemblyVersion)" Importance="high" />
+    <Message Text="📋 File Version: $(FileVersion)" Importance="high" />
+    <Message Text="════════════════════════════════════════════════════════" Importance="high" />
+  </Target>
+
+  <!-- Display success message after build -->
+  <Target Name="DisplayBuildSuccess" AfterTargets="Build">
+    <Message Text="✅ Build complete - Version $(Version)" Importance="high" />
+  </Target>
+  
+</Project>

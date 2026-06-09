@@ -1,0 +1,138 @@
+@using ReleaseNoteBuilder.Application.DTOs
+
+<div class="workitem-subsection">
+    <h5>🐛 Defects</h5>
+    <div class="workitem-query">
+        <textarea @bind="defectsQuery" 
+                  class="form-control query-input" 
+                  rows="2" 
+                  placeholder="ADO query for defects..."></textarea>
+        <button @onclick="SearchDefects" 
+                class="btn btn-sm btn-info" 
+                disabled="@isLoadingDefects">
+            @if (isLoadingDefects)
+            {
+                <span>🔍 Searching...</span>
+            }
+            else
+            {
+                <span>🔍 Search Defects</span>
+            }
+        </button>
+    </div>
+
+    @if (isLoadingDefects)
+    {
+        <p class="loading">⏳ Loading defects...</p>
+    }
+    else if (DefectItems.Any())
+    {
+        <div class="workitems-grid">
+            @foreach (var item in DefectItems)
+            {
+                var isSelected = SelectedWorkItems.Any(x => x.Id == item.Id);
+                <div class="work-item-card @(isSelected ? "selected" : "")" 
+                     @onclick="() => ToggleWorkItem(item, !isSelected)">
+                    <div class="work-item-header">
+                        <input type="checkbox" checked="@isSelected" 
+                               @onclick:stopPropagation 
+                               @onchange="@((ChangeEventArgs e) => ToggleWorkItem(item, (bool)e.Value!))" />
+                        <strong>@item.Title</strong>
+                        <span class="badge badge-danger">@item.Type</span>
+                    </div>
+                    <p>@item.Description</p>
+                    <small>ID: @item.AdoWorkItemId | Created: @item.CreatedDate.ToString("yyyy-MM-dd")</small>
+                </div>
+            }
+        </div>
+        <div class="selected-count">
+            Selected: @DefectItems.Count(x => SelectedWorkItems.Any(y => y.Id == x.Id)) / @DefectItems.Count items
+        </div>
+    }
+    else if (!isLoadingDefects && !DefectItems.Any())
+    {
+        <p class="no-items">No defects found.</p>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public List<WorkItemDto> DefectItems { get; set; } = new();
+
+    [Parameter]
+    public EventCallback<List<WorkItemDto>> DefectItemsChanged { get; set; }
+
+    [Parameter]
+    public List<WorkItemDto> SelectedWorkItems { get; set; } = new();
+
+    [Parameter]
+    public EventCallback<List<WorkItemDto>> SelectedWorkItemsChanged { get; set; }
+
+    [Parameter]
+    public string ErrorMessage { get; set; } = "";
+
+    [Parameter]
+    public EventCallback<string> ErrorMessageChanged { get; set; }
+
+    [Parameter]
+    public string Project { get; set; } = "";
+
+    private string defectsQuery = "[System.WorkItemType] = 'Bug' AND [System.State] = 'Active'";
+    private bool isLoadingDefects = false;
+
+    private async Task SearchDefects()
+    {
+        isLoadingDefects = true;
+        ErrorMessage = "";
+        try
+        {
+            // TODO: Integrate with ADO service using defectsQuery
+            // This should call: IAdoService.GetWorkItemsByQueryAsync(defectsQuery)
+
+            DefectItems = new List<WorkItemDto>
+            {
+                new WorkItemDto 
+                { 
+                    Id = 1, 
+                    AdoWorkItemId = "12345", 
+                    Title = "Login functionality bug", 
+                    Type = "Bug", 
+                    Description = "Users unable to login with SSO", 
+                    CreatedDate = DateTime.Now.AddDays(-5)
+                },
+                new WorkItemDto 
+                { 
+                    Id = 2, 
+                    AdoWorkItemId = "12347", 
+                    Title = "Password reset issue", 
+                    Type = "Bug", 
+                    Description = "Password reset email not sending", 
+                    CreatedDate = DateTime.Now.AddDays(-3)
+                }
+            };
+            await DefectItemsChanged.InvokeAsync(DefectItems);
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Failed to fetch defects: {ex.Message}";
+            await ErrorMessageChanged.InvokeAsync(ErrorMessage);
+        }
+        finally
+        {
+            isLoadingDefects = false;
+        }
+    }
+
+    private async Task ToggleWorkItem(WorkItemDto item, bool isSelected)
+    {
+        if (isSelected && !SelectedWorkItems.Any(x => x.Id == item.Id))
+        {
+            SelectedWorkItems.Add(item);
+        }
+        else if (!isSelected)
+        {
+            SelectedWorkItems.RemoveAll(x => x.Id == item.Id);
+        }
+        await SelectedWorkItemsChanged.InvokeAsync(SelectedWorkItems);
+    }
+}
