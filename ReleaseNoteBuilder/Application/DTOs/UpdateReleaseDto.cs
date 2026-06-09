@@ -1,8 +1,5 @@
 namespace ReleaseNoteBuilder.Application.DTOs;
 
-/// <summary>
-/// DTO for updating an existing release
-/// </summary>
 public class UpdateReleaseDto
 {
     public int Id { get; set; }

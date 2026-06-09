@@ -1,0 +1,37 @@
+@using ReleaseNoteBuilder.Application.DTOs
+
+<div class="workitems-section">
+    <h4>🐛 Work Items & ADO Tasks</h4>
+
+    <!-- Defects Section -->
+    <DefectsSection @bind-DefectItems="defectItems"
+                    @bind-SelectedWorkItems="SelectedWorkItems"
+                    @bind-ErrorMessage="ErrorMessage"
+                    Project="Project" />
+
+    <!-- User Stories Section -->
+    <UserStoriesSection @bind-UserStoryItems="userStoryItems"
+                        @bind-SelectedWorkItems="SelectedWorkItems"
+                        @bind-ErrorMessage="ErrorMessage"
+                        Project="Project" />
+</div>
+
+@code {
+    [Parameter]
+    public List<WorkItemDto> SelectedWorkItems { get; set; } = new();
+
+    [Parameter]
+    public EventCallback<List<WorkItemDto>> SelectedWorkItemsChanged { get; set; }
+
+    [Parameter]
+    public string Project { get; set; } = "";
+
+    [Parameter]
+    public string ErrorMessage { get; set; } = "";
+
+    [Parameter]
+    public EventCallback<string> ErrorMessageChanged { get; set; }
+
+    private List<WorkItemDto> defectItems = new();
+    private List<WorkItemDto> userStoryItems = new();
+}

@@ -21,10 +21,15 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 
 // Infrastructure - Repositories
 builder.Services.AddScoped<IReleaseRepository, ReleaseRepository>();
+builder.Services.AddScoped<IBuildRepository, BuildRepository>();
+builder.Services.AddScoped<IWorkItemRepository, WorkItemRepository>();
 
 // Application - Services
 builder.Services.AddScoped<IReleaseService, ReleaseService>();
+builder.Services.AddScoped<IBuildService, BuildService>();
+builder.Services.AddScoped<IWorkItemService, WorkItemService>();
 builder.Services.AddScoped<IReleaseNoteGenerator, ReleaseNoteGenerator>();
+builder.Services.AddScoped<IReleaseDocumentService, ReleaseDocumentService>();
 
 // Infrastructure - External Services
 builder.Services.AddScoped<AzureDevOpsService>();
@@ -35,8 +40,13 @@ var app = builder.Build();
 // Seed Data
 using (var scope = app.Services.CreateScope())
 {
-    var repo = scope.ServiceProvider.GetRequiredService<IReleaseRepository>();
-    await repo.SeedDataAsync();
+    var releaseRepo = scope.ServiceProvider.GetRequiredService<IReleaseRepository>();
+    var buildRepo = scope.ServiceProvider.GetRequiredService<IBuildRepository>();
+    var workItemRepo = scope.ServiceProvider.GetRequiredService<IWorkItemRepository>();
+    
+    await releaseRepo.SeedDataAsync();
+    await buildRepo.SeedDataAsync();
+    await workItemRepo.SeedDataAsync();
 }
 
 // Middleware

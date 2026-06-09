@@ -1,0 +1,428 @@
+@using Microsoft.JSInterop
+@using ReleaseNoteBuilder.Application.Interfaces
+@using ReleaseNoteBuilder.Application.DTOs
+@using ReleaseNoteBuilder.Pages.Components
+@inject IReleaseService ReleaseService
+@inject IReleaseDocumentService ReleaseDocumentService
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+<div class="tab-pane active">
+    <h3>Notification & Release Approval</h3>
+
+    <!-- Release Summary -->
+    <div class="summary-card">
+        <h4>📋 Release Summary</h4>
+        <table class="table">
+            <tr>
+                <td><strong>Project:</strong></td>
+                <td>@ReleaseForm.Project</td>
+            </tr>
+            <tr>
+                <td><strong>Build ID:</strong></td>
+                <td>@GeneratedBuildId</td>
+            </tr>
+            <tr>
+                <td><strong>Environment:</strong></td>
+                <td>@ReleaseForm.Environment</td>
+            </tr>
+            <tr>
+                <td><strong>Branch:</strong></td>
+                <td>@ReleaseForm.Branch</td>
+            </tr>
+            <tr>
+                <td><strong>Work Items:</strong></td>
+                <td>@SelectedWorkItems.Count items selected</td>
+            </tr>
+        </table>
+    </div>
+
+    <!-- Document Download Section -->
+    <div class="section">
+        <h4>📄 Release Document</h4>
+        <p>Generate and download the release notes document in Word format.</p>
+        
+        <button @onclick="DownloadReleaseDocument" class="btn btn-info" disabled="@isDownloading">
+            @if (isDownloading)
+            {
+                <span>⏳ Generating document...</span>
+            }
+            else
+            {
+                <span>📥 Download Release Document</span>
+            }
+        </button>
+    </div>
+
+    <!-- Notification Section -->
+    <div class="section">
+        <h4>📧 Send Release Notification</h4>
+
+        <div class="form-group">
+            <label>Recipient Emails *</label>
+            <textarea @bind="notificationEmails" 
+                      class="form-control" 
+                      rows="3" 
+                      placeholder="Enter email addresses (comma separated)"></textarea>
+            <small>e.g., dev@example.com, qa@example.com</small>
+        </div>
+
+        <div class="form-group">
+            <label>Message Template</label>
+            <select @bind="selectedTemplate" class="form-control">
+                <option value="standard">Standard Release Notification</option>
+                <option value="urgent">Urgent Release</option>
+                <option value="hotfix">Hotfix Release</option>
+                <option value="custom">Custom Message</option>
+            </select>
+        </div>
+
+        @if (selectedTemplate == "custom")
+        {
+            <div class="form-group">
+                <label>Custom Message</label>
+                <textarea @bind="customMessage" 
+                          class="form-control" 
+                          rows="4" 
+                          placeholder="Enter your custom message"></textarea>
+            </div>
+        }
+
+        <button @onclick="SendNotification" class="btn btn-info" disabled="@(!CanSendNotification())">
+            📧 Send Notification
+        </button>
+    </div>
+
+    <!-- Approval Section -->
+    <div class="section">
+        <h4>✅ Release Approval</h4>
+
+        <div class="form-group">
+            <label>Approval Type</label>
+            <select @bind="approvalType" class="form-control">
+                <option value="draft">Draft (Save for later)</option>
+                <option value="pending">Request Approval</option>
+                <option value="approved">Auto-Approve</option>
+            </select>
+        </div>
+
+        @if (approvalType == "pending" || approvalType == "approved")
+        {
+            <div class="form-group">
+                <label>Approver Name</label>
+                <input @bind="approverName" class="form-control" placeholder="Your name" />
+            </div>
+        }
+
+        <div class="form-group">
+            <label class="checkbox">
+                <input type="checkbox" @bind="assignToTesters" />
+                Assign bugs to QA testers automatically
+            </label>
+        </div>
+
+        @if (assignToTesters)
+        {
+            <div class="form-group">
+                <label>Tester Assignments</label>
+                <div class="tester-list">
+                    @foreach (var item in SelectedWorkItems.Where(x => x.Type == "Bug"))
+                    {
+                        <div class="tester-assignment">
+                            <span>@item.Title</span>
+                            <input type="text" placeholder="Assign to tester" class="form-control form-control-sm" />
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+
+    <!-- Pipeline Actions -->
+    <div class="section">
+        <h4>🚀 Pipeline & Deployment</h4>
+
+        <div class="action-buttons">
+            <button @onclick="ApproveAndDeploy" class="btn btn-success" disabled="@isCreatingRelease">
+                @if (isCreatingRelease)
+                {
+                    <span>⏳ Processing...</span>
+                }
+                else
+                {
+                    <span>✅ Approve & Create Release</span>
+                }
+            </button>
+            <button @onclick="UpdateBugStatus" class="btn btn-warning" disabled="@isCreatingRelease">
+                🏷 Update Bug Status
+            </button>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(SuccessMessage))
+    {
+        <div class="alert alert-success">✅ @SuccessMessage</div>
+    }
+
+    @if (!string.IsNullOrEmpty(ErrorMessage))
+    {
+        <div class="alert alert-danger">Error: @ErrorMessage</div>
+    }
+
+    <div class="form-actions">
+        <button @onclick="OnBack" class="btn btn-secondary btn-lg">Back</button>
+        <button type="button" @onclick="ValidateAndNext" class="btn btn-primary btn-lg" disabled="@isValidating">
+            @if (isValidating)
+            {
+                <span>Saving...</span>
+            }
+            else
+            {
+                <span>Save & Next</span>
+            }
+        </button>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public CreateReleaseDto ReleaseForm { get; set; } = new();
+
+    [Parameter]
+    public EventCallback<CreateReleaseDto> ReleaseFormChanged { get; set; }
+
+    [Parameter]
+    public int GeneratedBuildId { get; set; }
+
+    [Parameter]
+    public List<WorkItemDto> SelectedWorkItems { get; set; } = new();
+
+    [Parameter]
+    public string ErrorMessage { get; set; } = "";
+
+    [Parameter]
+    public EventCallback<string> ErrorMessageChanged { get; set; }
+
+    [Parameter]
+    public string SuccessMessage { get; set; } = "";
+
+    [Parameter]
+    public EventCallback<string> SuccessMessageChanged { get; set; }
+
+    [Parameter]
+    public EventCallback OnBack { get; set; }
+
+    [Parameter]
+    public EventCallback OnComplete { get; set; }
+
+    private string notificationEmails = "";
+    private string selectedTemplate = "standard";
+    private string customMessage = "";
+    private string approvalType = "draft";
+    private string approverName = "";
+    private bool assignToTesters = false;
+    private bool isCreatingRelease = false;
+    private bool isValidating = false;
+    private bool isDownloading = false;
+
+    [Parameter]
+    public BuildDto ProjectBuild { get; set; }
+
+    [Parameter]
+    public BuildDto ConfigBuild { get; set; }
+
+    private bool CanSendNotification()
+    {
+        return !string.IsNullOrWhiteSpace(notificationEmails) && !isCreatingRelease;
+    }
+
+    private async Task DownloadReleaseDocument()
+    {
+        isDownloading = true;
+        ErrorMessage = "";
+        try
+        {
+            // Extract bugs and PBIs from selected work items
+            var bugs = SelectedWorkItems.Where(x => x.Type == "Bug").ToList();
+            var pbis = SelectedWorkItems.Where(x => x.Type == "User Story").ToList();
+
+            // Generate the document
+            var documentBytes = ReleaseDocumentService.GenerateReleaseDocument(
+                projectName: ReleaseForm.Project,
+                environment: ReleaseForm.Environment,
+                projectBuild: ProjectBuild,
+                configBuild: ConfigBuild,
+                bugs: bugs,
+                pbis: pbis,
+                requestedBy: "Admin User",
+                approvedBy: "Release Management"
+            );
+
+            // Download the document using JavaScript interop
+            await JS.InvokeVoidAsync("BlazorDownloadFile", new
+            {
+                ByteArray = documentBytes,
+                FileName = $"ReleaseNotes_{ReleaseForm.Project}_{DateTime.Now:yyyyMMdd_HHmmss}.docx",
+                MimeType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            });
+
+            SuccessMessage = "Release document downloaded successfully!";
+            await SuccessMessageChanged.InvokeAsync(SuccessMessage);
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Failed to generate document: {ex.Message}";
+            await ErrorMessageChanged.InvokeAsync(ErrorMessage);
+        }
+        finally
+        {
+            isDownloading = false;
+        }
+    }
+
+    private async Task SendNotification()
+    {
+        try
+        {
+            // TODO: Integrate with email service
+            SuccessMessage = $"Notification sent to {notificationEmails}";
+            await SuccessMessageChanged.InvokeAsync(SuccessMessage);
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Failed to send notification: {ex.Message}";
+            await ErrorMessageChanged.InvokeAsync(ErrorMessage);
+        }
+    }
+
+    private async Task UpdateBugStatus()
+    {
+        try
+        {
+            var bugs = SelectedWorkItems.Where(x => x.Type == "Bug").ToList();
+            // TODO: Integrate with ADO service to update bug status
+            SuccessMessage = $"Updated status for {bugs.Count} bugs";
+            await SuccessMessageChanged.InvokeAsync(SuccessMessage);
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Failed to update bug status: {ex.Message}";
+            await ErrorMessageChanged.InvokeAsync(ErrorMessage);
+        }
+    }
+
+    private async Task ApproveAndDeploy()
+    {
+        isCreatingRelease = true;
+        ErrorMessage = "";
+        try
+        {
+            var created = await ReleaseService.CreateReleaseAsync(ReleaseForm);
+
+            if (approvalType == "approved" && !string.IsNullOrEmpty(approverName))
+            {
+                await ReleaseService.ApproveReleaseAsync(created.Id, approverName);
+            }
+            else if (approvalType == "pending")
+            {
+                await ReleaseService.RequestApprovalAsync(created.Id);
+            }
+
+            SuccessMessage = "Release created successfully!";
+            await SuccessMessageChanged.InvokeAsync(SuccessMessage);
+            await Task.Delay(2000);
+            await OnComplete.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Failed to create release: {ex.Message}";
+            await ErrorMessageChanged.InvokeAsync(ErrorMessage);
+        }
+        finally
+        {
+            isCreatingRelease = false;
+        }
+    }
+
+    private async Task SaveAndCreateRelease()
+    {
+        isCreatingRelease = true;
+        ErrorMessage = "";
+        try
+        {
+            var created = await ReleaseService.CreateReleaseAsync(ReleaseForm);
+
+            if (approvalType == "approved" && !string.IsNullOrEmpty(approverName))
+            {
+                await ReleaseService.ApproveReleaseAsync(created.Id, approverName);
+            }
+            else if (approvalType == "pending")
+            {
+                await ReleaseService.RequestApprovalAsync(created.Id);
+            }
+
+            SuccessMessage = "Release created successfully!";
+            await SuccessMessageChanged.InvokeAsync(SuccessMessage);
+            await Task.Delay(2000);
+            await OnComplete.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Failed to create release: {ex.Message}";
+            await ErrorMessageChanged.InvokeAsync(ErrorMessage);
+        }
+        finally
+        {
+            isCreatingRelease = false;
+        }
+    }
+
+    private async Task ValidateAndNext()
+    {
+        // Basic client-side validation
+        if (string.IsNullOrWhiteSpace(ReleaseForm.Project))
+        {
+            ErrorMessage = "Project is required.";
+            await ErrorMessageChanged.InvokeAsync(ErrorMessage);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(notificationEmails))
+        {
+            ErrorMessage = "Recipient Emails are required.";
+            await ErrorMessageChanged.InvokeAsync(ErrorMessage);
+            return;
+        }
+
+        isValidating = true;
+        ErrorMessage = "";
+        try
+        {
+            // Simulate saving data
+            await Task.Delay(1000);
+
+            SuccessMessage = "Data validated and saved successfully!";
+            await SuccessMessageChanged.InvokeAsync(SuccessMessage);
+            await Task.Delay(1000);
+
+            // Proceed to the next step or section
+            // This can be navigation to another component/page or simply showing the next section
+            // For demo, we'll just show an alert
+            // TODO: Implement actual navigation or section display logic
+            Console.WriteLine("Proceeding to the next step...");
+
+            // Optionally, reset or clear certain fields
+            // notificationEmails = "";
+            // customMessage = "";
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Failed to save data: {ex.Message}";
+            await ErrorMessageChanged.InvokeAsync(ErrorMessage);
+        }
+        finally
+        {
+            isValidating = false;
+        }
+    }
+}

@@ -1,0 +1,67 @@
+@using ReleaseNoteBuilder.Application.Interfaces
+@using ReleaseNoteBuilder.Application.DTOs
+@using ReleaseNoteBuilder.Pages.Components.Sections
+
+<div class="tab-pane active">
+    <h3>Builds & Work Items Configuration</h3>
+
+    <div class="builds-workitems-container">
+        <!-- LEFT SIDE: Builds Section -->
+        <BuildsConfigurationSection ReleaseForm="ReleaseForm"
+                                    ReleaseFormChanged="ReleaseFormChanged"
+                                    GeneratedBuildId="GeneratedBuildId"
+                                    ErrorMessage="ErrorMessage"
+                                    ErrorMessageChanged="ErrorMessageChanged"
+                                    SuccessMessage="SuccessMessage"
+                                    SuccessMessageChanged="SuccessMessageChanged" />
+
+        <!-- RIGHT SIDE: Work Items Section -->
+        <WorkItemsSection SelectedWorkItems="SelectedWorkItems"
+                          SelectedWorkItemsChanged="SelectedWorkItemsChanged"
+                          Project="ReleaseForm.Project"
+                          ErrorMessage="ErrorMessage"
+                          ErrorMessageChanged="ErrorMessageChanged" />
+    </div>
+
+    <div class="form-actions">
+        <button @onclick="async () => await OnBack.InvokeAsync()" class="btn btn-secondary">← Back</button>
+        <button @onclick="async () => await OnNext.InvokeAsync()" class="btn btn-primary" disabled="@(!SelectedWorkItems.Any())">
+            Next: Notification & Approval →
+        </button>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public CreateReleaseDto ReleaseForm { get; set; } = new();
+
+    [Parameter]
+    public EventCallback<CreateReleaseDto> ReleaseFormChanged { get; set; }
+
+    [Parameter]
+    public int GeneratedBuildId { get; set; }
+
+    [Parameter]
+    public List<WorkItemDto> SelectedWorkItems { get; set; } = new();
+
+    [Parameter]
+    public EventCallback<List<WorkItemDto>> SelectedWorkItemsChanged { get; set; }
+
+    [Parameter]
+    public string ErrorMessage { get; set; } = "";
+
+    [Parameter]
+    public EventCallback<string> ErrorMessageChanged { get; set; }
+
+    [Parameter]
+    public string SuccessMessage { get; set; } = "";
+
+    [Parameter]
+    public EventCallback<string> SuccessMessageChanged { get; set; }
+
+    [Parameter]
+    public EventCallback OnNext { get; set; }
+
+    [Parameter]
+    public EventCallback OnBack { get; set; }
+}

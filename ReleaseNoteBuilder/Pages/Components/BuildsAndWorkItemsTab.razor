@@ -1,0 +1,1315 @@
+@using ReleaseNoteBuilder.Application.Interfaces
+@using ReleaseNoteBuilder.Application.DTOs
+@inject IBuildService BuildService
+@inject IWorkItemService WorkItemService
+
+<div class="tab-pane">
+    <h3>Builds and Work Items</h3>
+
+    <!-- Build Type Selection Section -->
+    <div class="section">
+        <h4>Step 1: Select Build Type</h4>
+        <div class="build-type-buttons">
+            <button @onclick="@(() => SelectBuildType("full"))" 
+                    class="@GetBuildTypeClass("full")">
+                Build + Config
+            </button>
+            <button @onclick="@(() => SelectBuildType("config"))" 
+                    class="@GetBuildTypeClass("config")">
+                Config Build Only
+            </button>
+        </div>
+        @if (!string.IsNullOrEmpty(selectedBuildType))
+        {
+            <p class="mt-3 text-info">
+                Selected: <strong>@(selectedBuildType == "full" ? "Build + Config" : "Config Build Only")</strong>
+            </p>
+        }
+    </div>
+
+    <!-- Build & Config Selection Section - Always Visible -->
+    <div class="section">
+        <h4>Step 2: Select Build and Config Versions</h4>
+        
+        @if (isLoadingBuilds)
+        {
+            <div class="alert alert-info">
+                <p>Loading builds...</p>
+            </div>
+        }
+        else if (!availableBuilds.Any())
+        {
+            <div class="alert alert-warning">
+                <p>No builds available for project: <strong>@ProjectName</strong></p>
+            </div>
+        }
+        else
+        {
+            <div class="versions-grid">
+                <div class="version-column">
+                    <h5>Project Build</h5>
+                    <div class="version-list">
+                        @foreach (var build in availableBuilds)
+                        {
+                            var isSelected = selectedProjectBuild?.Id == build.Id;
+                            <label class="version-item @(isSelected ? "selected" : "")" 
+                                   @onclick="@(() => SelectProjectBuild(build))">
+                                <input type="radio" 
+                                       name="projectBuild" 
+                                       value="@build.Id"
+                                       checked="@isSelected"
+                                       @onchange="@((ChangeEventArgs e) => SelectProjectBuild(build))" 
+                                       class="radio-input" />
+                                <div class="build-info">
+                                    <strong>Build #@build.Id</strong>
+                                    <small class="version-badge">v@build.Version</small>
+                                    <small>@build.Project - @build.Branch</small>
+                                    <small class="status">@build.Status</small>
+                                </div>
+                            </label>
+                        }
+                    </div>
+                </div>
+
+                <div class="version-column">
+                    <h5>Config Build</h5>
+                    <div class="version-list">
+                        @foreach (var build in availableBuilds)
+                        {
+                            var isSelected = selectedConfigBuild?.Id == build.Id;
+                            <label class="version-item @(isSelected ? "selected" : "")" 
+                                   @onclick="@(() => SelectConfigBuild(build))">
+                                <input type="radio" 
+                                       name="configBuild" 
+                                       value="@build.Id"
+                                       checked="@isSelected"
+                                       @onchange="@((ChangeEventArgs e) => SelectConfigBuild(build))" 
+                                       class="radio-input" />
+                                <div class="build-info">
+                                    <strong>Build #@build.Id</strong>
+                                    <small class="version-badge">v@build.Version</small>
+                                    <small>@build.Project - @build.Branch</small>
+                                    <small class="status">@build.Status</small>
+                                </div>
+                            </label>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            @if (selectedProjectBuild != null && selectedConfigBuild != null)
+            {
+                <div class="alert alert-success mt-3">
+                    <strong>Builds Selected:</strong> 
+                    <br />Project Build #@selectedProjectBuild.Id (v@selectedProjectBuild.Version) - @selectedProjectBuild.Project
+                    <br />Config Build #@selectedConfigBuild.Id (v@selectedConfigBuild.Version) - @selectedConfigBuild.Project
+                </div>
+            }
+        }
+    </div>
+
+    <!-- Defects Section - Always Visible -->
+    <div class="section">
+        <h4>Step 3: Select Defects (Bugs)</h4>
+        
+        <div class="search-section">
+            <div class="search-controls">
+                <input @bind="defectSearchText" 
+                       class="form-control" 
+                       placeholder="Search by title, ID, or description..." />
+                <button @onclick="SearchDefects" class="btn btn-primary">
+                    Search
+                </button>
+                <button @onclick="ClearDefectSearch" class="btn btn-secondary">
+                    Clear
+                </button>
+            </div>
+        </div>
+
+        @if (isLoadingDefects)
+        {
+            <p class="text-info">Searching defects...</p>
+        }
+        else
+        {
+            <div class="work-items-list">
+                @if (searchedDefects.Any())
+                {
+                    @foreach (var defect in searchedDefects)
+                    {
+                        <div class="work-item-row-compact">
+                            <div class="work-item-header">
+                                <label class="checkbox-item-compact">
+                                    <input type="checkbox" 
+                                           class="checkbox-small"
+                                           @onchange="@((ChangeEventArgs e) => ToggleDefect(defect, (bool)e.Value))"
+                                           checked="@IsDefectSelected(defect)" />
+                                    <span class="checkbox-label-compact">
+                                        <strong>@defect.AdoWorkItemId</strong> - @defect.Title
+                                    </span>
+                                </label>
+                            </div>
+                            <div class="defect-details">
+                                <small class="detail-badge">👤 @defect.Author</small>
+                                <small class="priority-badge priority-@(defect.Priority?.ToLower() ?? "medium")">@defect.Priority</small>
+                                <small class="status-badge">@defect.Status</small>
+                            </div>
+                            <button @onclick="@(() => RemoveDefectFromList(defect))" 
+                                    class="btn-remove-item-compact" 
+                                    title="Remove">
+                                ✕
+                            </button>
+                        </div>
+                    }
+                }
+                else if (!defectSearchPerformed)
+                {
+                    <p class="text-muted">Click "Search" to load defects or select from the list below</p>
+                }
+                else
+                {
+                    <p class="text-warning">No defects found matching your search</p>
+                }
+            </div>
+            @if (searchedDefects.Any())
+            {
+                <div class="mt-2">
+                    <strong>Available Defects: @searchedDefects.Count | Selected: @selectedDefects.Count</strong>
+                </div>
+            }
+        }
+
+        <!-- Selected Defects Display -->
+        @if (selectedDefects.Any())
+        {
+            <div class="section mt-3">
+                <h5>Selected Defects (@selectedDefects.Count)</h5>
+                <div class="selected-items-list">
+                    @foreach (var defect in selectedDefects)
+                    {
+                        <div class="selected-item">
+                            <span class="item-id">ID: @defect.Id</span>
+                            <span class="item-badge">🐛 @defect.AdoWorkItemId</span>
+                            <span class="item-text">@defect.Title</span>
+                            <button @onclick="@(() => RemoveDefect(defect))" class="btn-remove">✕</button>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+
+    <!-- PBI Section - Always Visible -->
+    <div class="section">
+        <h4>Step 4: Select PBIs / User Stories</h4>
+        
+        <div class="search-section">
+            <div class="search-controls">
+                <input @bind="pbiSearchText" 
+                       class="form-control" 
+                       placeholder="Search by title, ID, or description..." />
+                <button @onclick="SearchPBIs" class="btn btn-primary">
+                    Search
+                </button>
+                <button @onclick="ClearPBISearch" class="btn btn-secondary">
+                    Clear
+                </button>
+            </div>
+        </div>
+
+        @if (isLoadingPBIs)
+        {
+            <p class="text-info">Searching PBIs...</p>
+        }
+        else
+        {
+            <div class="work-items-list">
+                @if (searchedPBIs.Any())
+                {
+                    @foreach (var pbi in searchedPBIs)
+                    {
+                        <div class="work-item-row">
+                            <div class="work-item-header">
+                                <label class="checkbox-item">
+                                    <input type="checkbox" 
+                                           @onchange="@((ChangeEventArgs e) => TogglePBI(pbi, (bool)e.Value))"
+                                           checked="@IsPBISelected(pbi)" />
+                                    <span class="checkbox-label">
+                                        <strong>@pbi.AdoWorkItemId</strong> - @pbi.Title
+                                        <small>(@pbi.Description)</small>
+                                    </span>
+                                </label>
+                            </div>
+                            <button @onclick="@(() => RemovePBIFromList(pbi))" 
+                                    class="btn-remove-item" 
+                                    title="Remove from list">
+                                ✕
+                            </button>
+                        </div>
+                    }
+                }
+                else if (!pbiSearchPerformed)
+                {
+                    <p class="text-muted">Click "Search" to load PBIs or select from the list below</p>
+                }
+                else
+                {
+                    <p class="text-warning">No PBIs found matching your search</p>
+                }
+            </div>
+            @if (searchedPBIs.Any())
+            {
+                <div class="mt-2">
+                    <strong>Available PBIs: @searchedPBIs.Count | Selected: @selectedPBIs.Count</strong>
+                </div>
+            }
+        }
+
+        <!-- Selected PBIs Display -->
+        @if (selectedPBIs.Any())
+        {
+            <div class="section mt-3">
+                <h5>Selected PBIs / User Stories (@selectedPBIs.Count)</h5>
+                <div class="selected-items-list">
+                    @foreach (var pbi in selectedPBIs)
+                    {
+                        <div class="selected-item">
+                            <span class="item-id">ID: @pbi.Id</span>
+                            <span class="item-badge">📋 @pbi.AdoWorkItemId</span>
+                            <span class="item-text">@pbi.Title</span>
+                            <button @onclick="@(() => RemovePBI(pbi))" class="btn-remove">✕</button>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+
+    <!-- Form Actions -->
+    <div class="section">
+        <div class="form-actions">
+            <button @onclick="GoBack" class="btn btn-secondary btn-lg">
+                Back
+            </button>
+            <button @onclick="SaveAndGoToNotifications" 
+                    class="btn btn-primary btn-lg" 
+                    disabled="@(selectedProjectBuild == null || selectedConfigBuild == null)">
+                Save and Next
+            </button>
+        </div>
+    </div>
+
+    <ReleaseDocumentDownload 
+        ProjectName="@ProjectName"
+        Environment="@ReleaseEnvironment"
+        ProjectBuild="@selectedProjectBuild"
+        ConfigBuild="@selectedConfigBuild"
+        Bugs="@selectedDefects"
+        PBIs="@selectedPBIs"
+        RequestedBy="@CurrentUser"
+        ApprovedBy="Release Management" />
+
+    @if (!string.IsNullOrEmpty(ErrorMessage))
+    {
+        <div class="alert alert-danger mt-3">Error: @ErrorMessage</div>
+    }
+</div>
+
+<style>
+    .section {
+        margin-bottom: 30px;
+        padding: 20px;
+        background: #f9f9f9;
+        border-radius: 8px;
+        border: 1px solid #eee;
+    }
+
+    h4, h5 {
+        margin-top: 0;
+        color: #333;
+    }
+
+    .build-type-buttons {
+        display: flex;
+        gap: 15px;
+        margin: 15px 0;
+        flex-wrap: wrap;
+    }
+
+    .btn {
+        padding: 10px 20px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+        background: white;
+    }
+
+    .btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .btn-large {
+        padding: 15px 30px;
+        font-size: 16px;
+        min-width: 200px;
+    }
+
+    .btn-outline {
+        background: white;
+        border: 2px solid #ddd;
+        color: #333;
+    }
+
+    .btn-outline:hover {
+        border-color: #0078d4;
+        color: #0078d4;
+    }
+
+    .btn-selected {
+        background: #0078d4;
+        color: white;
+        border-color: #0078d4;
+    }
+
+    .btn-primary {
+        background: #0078d4;
+        color: white;
+        border-color: #0078d4;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+        background: #006ab8;
+    }
+
+    .btn-secondary {
+        background: #6c757d;
+        color: white;
+        border-color: #6c757d;
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+        background: #5a6268;
+    }
+
+    .btn-lg {
+        padding: 12px 24px;
+        font-size: 16px;
+    }
+
+    .btn-sm {
+        padding: 6px 12px;
+        font-size: 12px;
+    }
+
+    .btn-remove {
+        background: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+        border-radius: 3px;
+        padding: 4px 8px;
+        font-size: 12px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .btn-remove:hover {
+        background: #f5c6cb;
+        color: #721c24;
+    }
+
+    .btn-remove-item {
+        background: #fff3cd;
+        color: #856404;
+        border: 1px solid #ffeaa7;
+        border-radius: 3px;
+        padding: 4px 8px;
+        font-size: 12px;
+        cursor: pointer;
+        transition: all 0.2s;
+        min-width: 32px;
+    }
+
+    .btn-remove-item:hover {
+        background: #ffeaa7;
+        color: #856404;
+    }
+
+    .versions-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        margin: 20px 0;
+    }
+
+    .version-column h5 {
+        font-size: 16px;
+        margin-bottom: 15px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #0078d4;
+    }
+
+    .version-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        max-height: 400px;
+        overflow-y: auto;
+        border: 1px solid #ddd;
+        padding: 10px;
+        border-radius: 4px;
+        background: white;
+    }
+
+    .version-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 12px;
+        background: #f5f5f5;
+        border: 2px solid transparent;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.2s;
+        margin: 0;
+    }
+
+    .version-item:hover {
+        background: #e8f4f8;
+        border-color: #0078d4;
+    }
+
+    .version-item.selected {
+        background: #d1ecf1;
+        border-color: #0078d4;
+        box-shadow: 0 0 0 3px rgba(0, 120, 212, 0.1);
+    }
+
+    .radio-input {
+        width: 16px;
+        height: 16px;
+        margin: 2px 0 0 0;
+        cursor: pointer;
+    }
+
+    .checkbox-small {
+        width: 16px;
+        height: 16px;
+        margin: 2px 0 0 0;
+        cursor: pointer;
+    }
+
+    .build-info {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        flex: 1;
+    }
+
+    .build-info strong {
+        display: block;
+        color: #0078d4;
+        margin-bottom: 4px;
+    }
+
+    .build-info small {
+        display: block;
+        color: #666;
+        font-size: 12px;
+    }
+
+    .version-badge {
+        background: #0078d4;
+        color: white;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-size: 11px;
+        font-weight: bold;
+        display: inline-block;
+        margin-right: 4px;
+        width: fit-content;
+    }
+
+    .version-item .status {
+        display: inline-block;
+        background: #e8f4f8;
+        padding: 2px 8px;
+        border-radius: 3px;
+        margin-top: 4px;
+        font-size: 11px;
+        color: #0078d4;
+        width: fit-content;
+    }
+
+    .search-section {
+        margin: 15px 0;
+    }
+
+    .search-controls {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .search-controls input {
+        flex: 1;
+        min-width: 200px;
+        padding: 10px 12px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 14px;
+    }
+
+    .work-items-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin: 15px 0;
+        max-height: 350px;
+        overflow-y: auto;
+        border: 1px solid #ddd;
+        padding: 10px;
+        border-radius: 4px;
+        background: white;
+    }
+
+    .work-item-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 12px;
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        border-left: 3px solid #0078d4;
+    }
+
+    .work-item-row-compact {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 8px 10px;
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        border-left: 3px solid #0078d4;
+    }
+
+    .work-item-header {
+        flex: 1;
+    }
+
+    .defect-details {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+    }
+
+    .detail-badge {
+        background: #e7f3ff;
+        color: #0078d4;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-size: 11px;
+        white-space: nowrap;
+    }
+
+    .priority-badge {
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-size: 11px;
+        font-weight: bold;
+        white-space: nowrap;
+    }
+
+    .priority-badge.priority-high {
+        background: #f8d7da;
+        color: #721c24;
+    }
+
+    .priority-badge.priority-medium {
+        background: #fff3cd;
+        color: #856404;
+    }
+
+    .priority-badge.priority-low {
+        background: #d4edda;
+        color: #155724;
+    }
+
+    .status-badge {
+        background: #e2e3e5;
+        color: #383d41;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-size: 11px;
+        white-space: nowrap;
+    }
+
+    .selected-items-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .selected-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px;
+        background: #d4edda;
+        border: 1px solid #c3e6cb;
+        border-radius: 4px;
+        border-left: 4px solid #28a745;
+    }
+
+    .item-id {
+        background: #156064;
+        color: white;
+        padding: 4px 8px;
+        border-radius: 3px;
+        font-weight: bold;
+        font-size: 11px;
+        white-space: nowrap;
+    }
+
+    .item-badge {
+        background: #28a745;
+        color: white;
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-weight: bold;
+        font-size: 12px;
+        white-space: nowrap;
+    }
+
+    .item-text {
+        flex: 1;
+        color: #155724;
+        font-size: 14px;
+    }
+
+    .checkbox-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        cursor: pointer;
+        margin: 0;
+    }
+
+    .checkbox-item-compact {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        cursor: pointer;
+        margin: 0;
+    }
+
+    .checkbox-item input {
+        margin-top: 4px;
+        cursor: pointer;
+    }
+
+    .checkbox-label {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .checkbox-label-compact {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        font-size: 13px;
+    }
+
+    .form-actions {
+        display: flex;
+        gap: 12px;
+        justify-content: space-between;
+        padding-top: 20px;
+        border-top: 1px solid #ddd;
+        flex-wrap: wrap;
+    }
+
+    .alert {
+        padding: 12px 16px;
+        border-radius: 4px;
+        margin: 10px 0;
+    }
+
+    .alert-info {
+        background: #d1ecf1;
+        color: #0c5460;
+    }
+
+    .alert-success {
+        background: #d4edda;
+        color: #155724;
+    }
+
+    .alert-warning {
+        background: #fff3cd;
+        color: #856404;
+    }
+
+    .alert-danger {
+        background: #f8d7da;
+        color: #721c24;
+    }
+
+    .text-info {
+        color: #0078d4;
+    }
+
+    .text-warning {
+        color: #ff9800;
+    }
+
+    .text-muted {
+        color: #999;
+    }
+
+    .mt-2 {
+        margin-top: 10px;
+    }
+
+    .mt-3 {
+        margin-top: 15px;
+    }
+
+    .form-control {
+        width: 100%;
+        box-sizing: border-box;
+    }
+</style>
+
+@code {
+    [Parameter]
+    public List<WorkItemDto> SelectedWorkItems { get; set; } = new();
+
+    [Parameter]
+    public EventCallback<List<WorkItemDto>> SelectedWorkItemsChanged { get; set; }
+
+    [Parameter]
+    public EventCallback OnComplete { get; set; }
+
+    [Parameter]
+    public EventCallback OnBack { get; set; }
+
+    [Parameter]
+    public string ProjectName { get; set; } = "";
+
+    [Parameter]
+    public int BuildId { get; set; } = 0;
+
+    [Parameter]
+    public string ErrorMessage { get; set; } = "";
+
+    [Parameter]
+    public EventCallback<string> ErrorMessageChanged { get; set; }
+
+    [Parameter]
+    public BuildDto SelectedProjectBuild { get; set; }
+
+    [Parameter]
+    public BuildDto SelectedConfigBuild { get; set; }
+
+    [Parameter]
+    public string ReleaseEnvironment { get; set; } = "Production";
+
+    [Parameter]
+    public string CurrentUser { get; set; } = "Admin User";
+
+    private string selectedBuildType = "";
+    private BuildDto selectedProjectBuild = null;
+    private BuildDto selectedConfigBuild = null;
+    private List<BuildDto> availableBuilds = new();
+
+    private List<WorkItemDto> searchedDefects = new();
+    private List<WorkItemDto> searchedPBIs = new();
+    private List<WorkItemDto> selectedDefects = new();
+    private List<WorkItemDto> selectedPBIs = new();
+
+    private string defectSearchText = "";
+    private string pbiSearchText = "";
+
+    private bool defectSearchPerformed = false;
+    private bool pbiSearchPerformed = false;
+    private bool isLoadingBuilds = false;
+    private bool isLoadingDefects = false;
+    private bool isLoadingPBIs = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await FetchBuilds();
+        await InitializeSampleData();
+    }
+
+    private async Task FetchBuilds()
+    {
+        isLoadingBuilds = true;
+        ErrorMessage = "";
+        try
+        {
+            if (!string.IsNullOrEmpty(ProjectName))
+            {
+                availableBuilds = await BuildService.GetBuildsByProjectAsync(ProjectName);
+            }
+            else
+            {
+                availableBuilds = await BuildService.GetAllBuildsAsync();
+            }
+
+            // If no builds from service, use sample data
+            if (!availableBuilds.Any())
+            {
+                availableBuilds = GetSampleBuilds();
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Failed to fetch builds: {ex.Message}";
+            await ErrorMessageChanged.InvokeAsync(ErrorMessage);
+            // Use sample data on error
+            availableBuilds = GetSampleBuilds();
+        }
+        finally
+        {
+            isLoadingBuilds = false;
+        }
+    }
+
+    private async Task InitializeSampleData()
+    {
+        try
+        {
+            var allDefects = await WorkItemService.GetWorkItemsByTypeAsync("Bug");
+            if (!allDefects.Any())
+            {
+                searchedDefects = GetSampleDefects();
+            }
+            else
+            {
+                searchedDefects = allDefects;
+            }
+
+            var allPBIs = await WorkItemService.GetWorkItemsByTypeAsync("User Story");
+            if (!allPBIs.Any())
+            {
+                searchedPBIs = GetSamplePBIs();
+            }
+            else
+            {
+                searchedPBIs = allPBIs;
+            }
+
+            defectSearchPerformed = true;
+            pbiSearchPerformed = true;
+        }
+        catch
+        {
+            // Use sample data on error
+            searchedDefects = GetSampleDefects();
+            searchedPBIs = GetSamplePBIs();
+            defectSearchPerformed = true;
+            pbiSearchPerformed = true;
+        }
+    }
+
+    private List<BuildDto> GetSampleBuilds()
+    {
+        return new List<BuildDto>
+        {
+            new BuildDto 
+            { 
+                Id = 1001, 
+                Project = "MortgageMate - Au", 
+                Version = "2.1.5",
+                Branch = "main", 
+                Status = "Success",
+                CreatedDate = DateTime.Now.AddDays(-5)
+            },
+            new BuildDto 
+            { 
+                Id = 1002, 
+                Project = "MortgageMate - Au", 
+                Version = "2.1.4",
+                Branch = "main", 
+                Status = "Success",
+                CreatedDate = DateTime.Now.AddDays(-3)
+            },
+            new BuildDto 
+            { 
+                Id = 1003, 
+                Project = "MortgageMate - Au", 
+                Version = "2.2.0-beta",
+                Branch = "develop", 
+                Status = "Success",
+                CreatedDate = DateTime.Now.AddDays(-2)
+            },
+            new BuildDto 
+            { 
+                Id = 1004, 
+                Project = "Release Note Builder", 
+                Version = "1.2.3",
+                Branch = "main", 
+                Status = "Success",
+                CreatedDate = DateTime.Now.AddDays(-1)
+            },
+            new BuildDto 
+            { 
+                Id = 1005, 
+                Project = "Release Note Builder", 
+                Version = "1.3.0",
+                Branch = "feature/enhancements", 
+                Status = "Running",
+                CreatedDate = DateTime.Now
+            },
+        };
+    }
+
+    private List<WorkItemDto> GetSampleDefects()
+    {
+        return new List<WorkItemDto>
+        {
+            new WorkItemDto 
+            { 
+                Id = 101, 
+                AdoWorkItemId = "BUG-001", 
+                Title = "Login page not responsive on mobile", 
+                Description = "Users experiencing issues on iOS and Android devices",
+                Type = "Bug",
+                Author = "John Smith",
+                Priority = "High",
+                Status = "Active",
+                CreatedDate = DateTime.Now.AddDays(-10)
+            },
+            new WorkItemDto 
+            { 
+                Id = 102, 
+                AdoWorkItemId = "BUG-002", 
+                Title = "Email notification not sending", 
+                Description = "Notifications failing in production environment",
+                Type = "Bug",
+                Author = "Sarah Johnson",
+                Priority = "High",
+                Status = "Active",
+                CreatedDate = DateTime.Now.AddDays(-8)
+            },
+            new WorkItemDto 
+            { 
+                Id = 103, 
+                AdoWorkItemId = "BUG-003", 
+                Title = "Data export timeout", 
+                Description = "Large exports timing out after 30 seconds",
+                Type = "Bug",
+                Author = "Mike Davis",
+                Priority = "Medium",
+                Status = "Active",
+                CreatedDate = DateTime.Now.AddDays(-6)
+            },
+            new WorkItemDto 
+            { 
+                Id = 104, 
+                AdoWorkItemId = "BUG-004", 
+                Title = "Dashboard charts not updating", 
+                Description = "Real-time chart updates lagging behind actual data",
+                Type = "Bug",
+                Author = "Emma Wilson",
+                Priority = "Medium",
+                Status = "Active",
+                CreatedDate = DateTime.Now.AddDays(-4)
+            },
+            new WorkItemDto 
+            { 
+                Id = 105, 
+                AdoWorkItemId = "BUG-005", 
+                Title = "Search filter performance issues", 
+                Description = "Filter searches taking longer than expected",
+                Type = "Bug",
+                Author = "Robert Brown",
+                Priority = "Low",
+                Status = "Active",
+                CreatedDate = DateTime.Now.AddDays(-2)
+            },
+        };
+    }
+
+    private List<WorkItemDto> GetSamplePBIs()
+    {
+        return new List<WorkItemDto>
+        {
+            new WorkItemDto 
+            { 
+                Id = 201, 
+                AdoWorkItemId = "PBUI-001", 
+                Title = "Implement dark mode theme", 
+                Description = "Add system-wide dark mode support for user interface",
+                Type = "User Story",
+                Author = "Lisa Anderson",
+                Priority = "High",
+                Status = "Active",
+                CreatedDate = DateTime.Now.AddDays(-15)
+            },
+            new WorkItemDto 
+            { 
+                Id = 202, 
+                AdoWorkItemId = "PBUI-002", 
+                Title = "Multi-language support (i18n)", 
+                Description = "Add internationalization for English, French, Spanish",
+                Type = "User Story",
+                Author = "James Taylor",
+                Priority = "Medium",
+                Status = "Active",
+                CreatedDate = DateTime.Now.AddDays(-12)
+            },
+            new WorkItemDto 
+            { 
+                Id = 203, 
+                AdoWorkItemId = "PBUI-003", 
+                Title = "Enhanced user profile management", 
+                Description = "Allow users to customize profile settings and preferences",
+                Type = "User Story",
+                Author = "Patricia Martinez",
+                Priority = "Medium",
+                Status = "Active",
+                CreatedDate = DateTime.Now.AddDays(-9)
+            },
+            new WorkItemDto 
+            { 
+                Id = 204, 
+                AdoWorkItemId = "PBUI-004", 
+                Title = "API rate limiting implementation", 
+                Description = "Implement rate limiting for API endpoints",
+                Type = "User Story",
+                Author = "Christopher Lee",
+                Priority = "High",
+                Status = "Active",
+                CreatedDate = DateTime.Now.AddDays(-7)
+            },
+            new WorkItemDto 
+            { 
+                Id = 205, 
+                AdoWorkItemId = "PBUI-005", 
+                Title = "Advanced reporting dashboard", 
+                Description = "Create comprehensive analytics and reporting features",
+                Type = "User Story",
+                Author = "Nancy White",
+                Priority = "Low",
+                Status = "Active",
+                CreatedDate = DateTime.Now.AddDays(-3)
+            },
+        };
+    }
+
+    private string GetBuildTypeClass(string buildType)
+    {
+        if (selectedBuildType == buildType)
+        {
+            return "btn btn-large btn-selected";
+        }
+        return "btn btn-large btn-outline";
+    }
+
+    private void SelectBuildType(string buildType)
+    {
+        selectedBuildType = buildType;
+        selectedProjectBuild = null;
+        selectedConfigBuild = null;
+        StateHasChanged();
+    }
+
+    private void SelectProjectBuild(BuildDto build)
+    {
+        selectedProjectBuild = build;
+        StateHasChanged();
+    }
+
+    private void SelectConfigBuild(BuildDto build)
+    {
+        selectedConfigBuild = build;
+        StateHasChanged();
+    }
+
+    private async Task SearchDefects()
+    {
+        isLoadingDefects = true;
+        defectSearchPerformed = true;
+        ErrorMessage = "";
+        try
+        {
+            var allDefects = await WorkItemService.GetWorkItemsByTypeAsync("Bug");
+            
+            if (!allDefects.Any())
+            {
+                allDefects = GetSampleDefects();
+            }
+
+            searchedDefects = string.IsNullOrEmpty(defectSearchText)
+                ? allDefects
+                : allDefects.Where(d =>
+                    d.Title.Contains(defectSearchText, StringComparison.OrdinalIgnoreCase) ||
+                    d.AdoWorkItemId.Contains(defectSearchText, StringComparison.OrdinalIgnoreCase) ||
+                    d.Description.Contains(defectSearchText, StringComparison.OrdinalIgnoreCase)
+                ).ToList();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Failed to search defects: {ex.Message}";
+            await ErrorMessageChanged.InvokeAsync(ErrorMessage);
+            searchedDefects = GetSampleDefects();
+        }
+        finally
+        {
+            isLoadingDefects = false;
+        }
+    }
+
+    private async Task SearchPBIs()
+    {
+        isLoadingPBIs = true;
+        pbiSearchPerformed = true;
+        ErrorMessage = "";
+        try
+        {
+            var allPBIs = await WorkItemService.GetWorkItemsByTypeAsync("User Story");
+            
+            if (!allPBIs.Any())
+            {
+                allPBIs = GetSamplePBIs();
+            }
+
+            searchedPBIs = string.IsNullOrEmpty(pbiSearchText)
+                ? allPBIs
+                : allPBIs.Where(p =>
+                    p.Title.Contains(pbiSearchText, StringComparison.OrdinalIgnoreCase) ||
+                    p.AdoWorkItemId.Contains(pbiSearchText, StringComparison.OrdinalIgnoreCase) ||
+                    p.Description.Contains(pbiSearchText, StringComparison.OrdinalIgnoreCase)
+                ).ToList();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Failed to search PBIs: {ex.Message}";
+            await ErrorMessageChanged.InvokeAsync(ErrorMessage);
+            searchedPBIs = GetSamplePBIs();
+        }
+        finally
+        {
+            isLoadingPBIs = false;
+        }
+    }
+
+    private void ClearDefectSearch()
+    {
+        defectSearchText = "";
+        searchedDefects = GetSampleDefects();
+        selectedDefects.Clear();
+        UpdateSelectedWorkItems();
+    }
+
+    private void ClearPBISearch()
+    {
+        pbiSearchText = "";
+        searchedPBIs = GetSamplePBIs();
+        selectedPBIs.Clear();
+        UpdateSelectedWorkItems();
+    }
+
+    private bool IsDefectSelected(WorkItemDto defect)
+    {
+        return selectedDefects.Any(x => x.Id == defect.Id);
+    }
+
+    private void ToggleDefect(WorkItemDto defect, bool isSelected)
+    {
+        if (isSelected)
+        {
+            if (!IsDefectSelected(defect))
+                selectedDefects.Add(defect);
+        }
+        else
+        {
+            selectedDefects.RemoveAll(x => x.Id == defect.Id);
+        }
+        UpdateSelectedWorkItems();
+    }
+
+    private void RemoveDefect(WorkItemDto defect)
+    {
+        selectedDefects.RemoveAll(x => x.Id == defect.Id);
+        UpdateSelectedWorkItems();
+    }
+
+    private void RemoveDefectFromList(WorkItemDto defect)
+    {
+        searchedDefects.Remove(defect);
+        RemoveDefect(defect);
+    }
+
+    private bool IsPBISelected(WorkItemDto pbi)
+    {
+        return selectedPBIs.Any(x => x.Id == pbi.Id);
+    }
+
+    private void TogglePBI(WorkItemDto pbi, bool isSelected)
+    {
+        if (isSelected)
+        {
+            if (!IsPBISelected(pbi))
+                selectedPBIs.Add(pbi);
+        }
+        else
+        {
+            selectedPBIs.RemoveAll(x => x.Id == pbi.Id);
+        }
+        UpdateSelectedWorkItems();
+    }
+
+    private void RemovePBI(WorkItemDto pbi)
+    {
+        selectedPBIs.RemoveAll(x => x.Id == pbi.Id);
+        UpdateSelectedWorkItems();
+    }
+
+    private void RemovePBIFromList(WorkItemDto pbi)
+    {
+        searchedPBIs.Remove(pbi);
+        RemovePBI(pbi);
+    }
+
+    private void UpdateSelectedWorkItems()
+    {
+        SelectedWorkItems.Clear();
+        SelectedWorkItems.AddRange(selectedDefects);
+        SelectedWorkItems.AddRange(selectedPBIs);
+    }
+
+    private async Task SaveAndGoToNotifications()
+    {
+        // Pass complete payload to next page
+        var releaseData = new
+        {
+            ProjectName = ProjectName,
+            Environment = "Production",
+            ProjectBuild = selectedProjectBuild,
+            ConfigBuild = selectedConfigBuild,
+            SelectedDefects = selectedDefects,
+            SelectedPBIs = selectedPBIs
+        };
+
+        // Store in session or pass via component parameters
+        await SelectedWorkItemsChanged.InvokeAsync(selectedDefects.Concat(selectedPBIs).ToList());
+        await OnComplete.InvokeAsync();
+    }
+
+    private async Task GoBack()
+    {
+        await OnBack.InvokeAsync();
+    }
+}

@@ -1,0 +1,319 @@
+@using ReleaseNoteBuilder.Application.Interfaces
+@using ReleaseNoteBuilder.Application.DTOs
+@inject IReleaseService ReleaseService
+
+<div class="tab-pane">
+    <h3>Release Details</h3>
+
+    <form class="release-details-form">
+        <div class="form-grid">
+            <div class="form-group">
+                <label for="project">Project Name *</label>
+                <select 
+                    id="project"
+                    @bind="ReleaseForm.Project" 
+                    class="form-control"
+                    required>
+                    <option value="">-- Select Project --</option>
+                    <option value="MortgageMate - Au">MortgageMate - Au</option>
+                    <option value="Release Note Builder">Release Note Builder</option>
+                </select>
+                <small class="text-muted">Selecting a project will auto-generate Build ID</small>
+            </div>
+
+            <div class="form-group">
+                <label for="environment">Environment *</label>
+                <select 
+                    id="environment"
+                    @bind="ReleaseForm.Environment" 
+                    class="form-control"
+                    required>
+                    <option value="">-- Select Environment --</option>
+                    <option value="DEV">Development (DEV)</option>
+                    <option value="TEST">Testing (TEST)</option>
+                    <option value="UAT">User Acceptance (UAT)</option>
+                    <option value="PROD">Production (PROD)</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="branch">Branch *</label>
+                <input 
+                    id="branch"
+                    @bind="ReleaseForm.Branch" 
+                    class="form-control" 
+                    placeholder="e.g., main, develop, feature/xyz"
+                    required />
+            </div>
+        </div>
+
+        <div class="form-group full-width">
+            <label for="notes">Release Notes</label>
+            <textarea 
+                id="notes"
+                @bind="ReleaseForm.Notes" 
+                class="form-control" 
+                rows="6"
+                placeholder="Enter release notes, changes, bug fixes, etc."></textarea>
+        </div>
+
+        <!-- Validation Messages -->
+        @if (!string.IsNullOrEmpty(validationError))
+        {
+            <div class="alert alert-danger">Error: @validationError</div>
+        }
+
+        @if (!string.IsNullOrEmpty(ErrorMessage))
+        {
+            <div class="alert alert-danger">Error: @ErrorMessage</div>
+        }
+
+        @if (!string.IsNullOrEmpty(SuccessMessage))
+        {
+            <div class="alert alert-success">Success: @SuccessMessage</div>
+        }
+
+        <!-- Form Actions -->
+        <div class="form-actions">
+            <button type="button" @onclick="OnCancel" class="btn btn-secondary">
+                Back
+            </button>
+            <button type="button" @onclick="ValidateAndNext" class="btn btn-primary btn-lg" disabled="@isValidating">
+                @if (isValidating)
+                {
+                    <span>Saving...</span>
+                }
+                else
+                {
+                    <span>Save & Next</span>
+                }
+            </button>
+        </div>
+    </form>
+</div>
+
+<style>
+    .release-details-form {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+
+    .form-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 20px;
+    }
+
+    .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .form-group.full-width {
+        grid-column: 1 / -1;
+    }
+
+    .form-control {
+        padding: 10px 12px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 14px;
+        font-family: inherit;
+        transition: border-color 0.2s;
+    }
+
+    .form-control:focus {
+        outline: none;
+        border-color: #0078d4;
+        box-shadow: 0 0 0 3px rgba(0, 120, 212, 0.1);
+    }
+
+    .text-muted {
+        font-size: 12px;
+        color: #666;
+    }
+
+    .form-actions {
+        display: flex;
+        gap: 12px;
+        justify-content: flex-end;
+        padding-top: 20px;
+        border-top: 1px solid #eee;
+    }
+
+    .btn {
+        padding: 10px 20px;
+        border: none;
+        border-radius: 4px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .btn-primary {
+        background: #0078d4;
+        color: white;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+        background: #006ab8;
+    }
+
+    .btn-primary.btn-lg {
+        padding: 12px 24px;
+        font-size: 16px;
+    }
+
+    .btn-secondary {
+        background: #e7e7e7;
+        color: #333;
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+        background: #ccc;
+    }
+
+    .alert {
+        padding: 12px 16px;
+        border-radius: 4px;
+        margin: 10px 0;
+    }
+
+    .alert-danger {
+        background: #fde7e7;
+        color: #c50f1f;
+        border: 1px solid #ffb3b3;
+    }
+
+    .alert-success {
+        background: #dffcf0;
+        color: #107c10;
+        border: 1px solid #b4efdb;
+    }
+</style>
+
+@code {
+    [Parameter]
+    public CreateReleaseDto ReleaseForm { get; set; } = new();
+
+    [Parameter]
+    public EventCallback<CreateReleaseDto> ReleaseFormChanged { get; set; }
+
+    [Parameter]
+    public int GeneratedBuildId { get; set; }
+
+    [Parameter]
+    public EventCallback<int> GeneratedBuildIdChanged { get; set; }
+
+    [Parameter]
+    public string ErrorMessage { get; set; } = "";
+
+    [Parameter]
+    public string SuccessMessage { get; set; } = "";
+
+    [Parameter]
+    public EventCallback OnNext { get; set; }
+
+    [Parameter]
+    public EventCallback OnCancel { get; set; }
+
+    private string validationError = "";
+    private bool isValidating = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (GeneratedBuildId <= 0)
+        {
+            await GenerateNextBuildId();
+        }
+    }
+
+    private async Task GenerateNextBuildId()
+    {
+        try
+        {
+            var allReleases = await ReleaseService.GetAllReleasesAsync();
+            var projectReleases = allReleases
+                .Where(r => r.Project == ReleaseForm.Project)
+                .OrderByDescending(r => r.BuildId)
+                .ToList();
+
+            var nextBuildId = projectReleases.Any() 
+                ? projectReleases.First().BuildId + 1 
+                : 1;
+
+            GeneratedBuildId = nextBuildId;
+            await GeneratedBuildIdChanged.InvokeAsync(GeneratedBuildId);
+        }
+        catch (Exception ex)
+        {
+            validationError = ex.Message;
+        }
+    }
+
+    private async Task ValidateAndNext()
+    {
+        validationError = "";
+        isValidating = true;
+
+        try
+        {
+            // Validate project
+            if (string.IsNullOrWhiteSpace(ReleaseForm.Project))
+            {
+                validationError = "Please select a project";
+                isValidating = false;
+                return;
+            }
+
+            // Generate Build ID if not set
+            if (GeneratedBuildId <= 0)
+            {
+                await GenerateNextBuildId();
+            }
+
+            // Validate environment
+            if (string.IsNullOrWhiteSpace(ReleaseForm.Environment))
+            {
+                validationError = "Please select an environment";
+                isValidating = false;
+                return;
+            }
+
+            // Default branch
+            if (string.IsNullOrWhiteSpace(ReleaseForm.Branch))
+            {
+                ReleaseForm.Branch = "develop";
+            }
+
+            // Set build ID in form
+            ReleaseForm.BuildId = GeneratedBuildId;
+
+            // Notify parent of changes
+            await ReleaseFormChanged.InvokeAsync(ReleaseForm);
+
+            // Small delay to ensure binding is updated
+            await Task.Delay(100);
+
+            // Move to next tab
+            await OnNext.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            validationError = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isValidating = false;
+            StateHasChanged();
+        }
+    }
+}
